@@ -1,0 +1,25 @@
+from fastapi import APIRouter
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, students, teachers, course_outline, llm_configs, student_learning
+
+api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
+api_router.include_router(majors.router, prefix="/majors", tags=["majors"])
+api_router.include_router(courses.router, prefix="/courses", tags=["courses"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(dictionary.router, prefix="/dictionary", tags=["dictionary"])
+api_router.include_router(course_covers.router, prefix="/course-covers", tags=["course-covers"])
+api_router.include_router(teaching_resources.router, prefix="/teacher/resources", tags=["teaching-resources"])
+api_router.include_router(resource_folders.router, prefix="/teacher/folders", tags=["resource-folders"])
+api_router.include_router(reference_materials.router, prefix="/teacher/references", tags=["reference-materials"])
+api_router.include_router(reference_folders.router, prefix="/teacher/reference-folders", tags=["reference-folders"])
+api_router.include_router(questions.router, prefix="/teacher/questions", tags=["questions"])
+api_router.include_router(knowledge_graphs.router, prefix="/teacher/knowledge-graphs", tags=["knowledge-graphs"])
+api_router.include_router(exam_papers.router, prefix="/teacher/exam-papers", tags=["exam-papers"])
+api_router.include_router(exams.router, prefix="/teacher/exams", tags=["exams"])
+api_router.include_router(students.router, prefix="/student", tags=["students"])
+api_router.include_router(teachers.router, prefix="/teacher", tags=["teachers"])
+api_router.include_router(course_outline.router, prefix="/teacher", tags=["course-outline"])
+api_router.include_router(llm_configs.router, prefix="/admin/llm-configs", tags=["llm-configs"])
+api_router.include_router(student_learning.router, prefix="/student/learning", tags=["student-learning"])
+
