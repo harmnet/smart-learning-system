@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, Any, Union
 from jose import jwt
-import hashlib
+import bcrypt
 from app.core.config import settings
 
 ALGORITHM = "HS256"
@@ -16,11 +16,20 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
     return encoded_jwt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # Use SHA256 for simplicity
-    password_hash = hashlib.sha256((plain_password + settings.SECRET_KEY).encode()).hexdigest()
-    return password_hash == hashed_password
+    """验证密码"""
+    try:
+        # 将密码和哈希值转换为字节
+        password_bytes = plain_password.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
+    except Exception as e:
+        print(f"密码验证错误: {e}")
+        return False
 
 def get_password_hash(password: str) -> str:
-    # Use SHA256 for simplicity
-    return hashlib.sha256((password + settings.SECRET_KEY).encode()).hexdigest()
+    """生成密码哈希"""
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 

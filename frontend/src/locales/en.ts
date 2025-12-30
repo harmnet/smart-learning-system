@@ -47,6 +47,7 @@ export const en: Translations = {
     menu: 'Menu',
     close: 'Close',
     etc: ' and ',
+    deleteSuccess: 'Deleted successfully',
   },
   nav: {
     admin: 'Admin Console',
@@ -291,6 +292,7 @@ export const en: Translations = {
     organizations: {
       title: 'Organization Management',
       subtitle: 'Maintain organizational tree structure',
+      emptyHint: 'Click "Add Organization" button in the top right corner to create an organization',
       stats: {
         total: 'Total Organizations',
         root: 'Root Node',
@@ -304,11 +306,24 @@ export const en: Translations = {
         path: 'Path',
         majors: 'Majors',
         classes: 'Classes',
-        students: 'Students'
+        students: 'Students',
+        creator: 'Creator',
+        createdAt: 'Created At',
+        updater: 'Last Updated By',
+        updatedAt: 'Last Updated At',
+        actions: 'Actions'
+      },
+      viewMode: {
+        list: 'List',
+        tree: 'Organization Structure',
+        switchToTree: 'View Mode: Organization Structure',
+        switchToList: 'View Mode: List'
       },
       addTitle: 'Add Organization',
       editTitle: 'Edit Organization',
+      addChild: 'Add Child Organization',
       selectParent: 'Select Parent',
+      selectParentHint: 'Select parent organization, leave empty for root node',
       rootNode: 'Root Node',
       noParent: 'No Parent (Root)',
       hasChildren: 'This organization has children, cannot delete',
@@ -316,6 +331,10 @@ export const en: Translations = {
       deleteError: {
         hasChildren: 'Cannot delete organization: This organization has child organizations. Please delete or move the children first.',
         hasMajors: 'Cannot delete organization: There are majors associated with this organization or its children. Please delete or reassign the majors first.'
+      },
+      deleteConfirm: {
+        title: 'Confirm Delete',
+        message: 'Are you sure you want to delete this organization? This action cannot be undone.'
       }
     },
     dictionary: {

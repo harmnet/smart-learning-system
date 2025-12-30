@@ -36,6 +36,7 @@ class FolderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+@router.get("", response_model=List[FolderResponse])
 @router.get("/", response_model=List[FolderResponse])
 async def get_folders(
     teacher_id: int,

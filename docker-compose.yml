@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: smartlearning123
-      POSTGRES_DB: smart_learning
+      POSTGRES_DB: smartlearning
     ports:
       - "5433:5432"  # 使用5433避免与现有容器冲突
     volumes:

@@ -37,11 +37,15 @@ class Organization(Base):
     name = Column(String, nullable=False)
     parent_id = Column(Integer, ForeignKey("organization.id"), nullable=True)
     is_active = Column(Boolean, default=True)
+    created_by = Column(Integer, ForeignKey("sys_user.id"), nullable=True)
+    updated_by = Column(Integer, ForeignKey("sys_user.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
     
     # Relationships
     majors = relationship("Major", back_populates="organization")
+    creator = relationship("User", foreign_keys=[created_by])
+    updater = relationship("User", foreign_keys=[updated_by])
 
 class Major(Base):
     __tablename__ = "major"

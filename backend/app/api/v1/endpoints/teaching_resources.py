@@ -118,6 +118,7 @@ async def get_resources_stats(
         "by_type": type_stats
     }
 
+@router.get("", response_model=List[TeachingResourceResponse])
 @router.get("/", response_model=List[TeachingResourceResponse])
 async def get_resources(
     teacher_id: int,

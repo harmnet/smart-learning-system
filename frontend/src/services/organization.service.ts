@@ -9,6 +9,12 @@ export interface Organization {
   majors_count?: number;
   classes_count?: number;
   students_count?: number;
+  created_by?: number | null;
+  updated_by?: number | null;
+  creator_name?: string | null;
+  updater_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface OrganizationCreate {
@@ -30,7 +36,7 @@ export interface OrganizationTreeResponse {
 }
 
 export const organizationService = {
-  getAll: async (params?: { skip?: number; limit?: number }): Promise<OrganizationTreeResponse> => {
+  getAll: async (params?: { skip?: number; limit?: number; search?: string }): Promise<OrganizationTreeResponse> => {
     const response = await apiClient.get<OrganizationTreeResponse>('/organizations/', { params });
     return response.data;
   },

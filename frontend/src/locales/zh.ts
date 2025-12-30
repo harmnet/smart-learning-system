@@ -45,6 +45,7 @@ export const zh = {
     menu: '菜单',
     close: '关闭',
     etc: '等',
+    deleteSuccess: '删除成功',
   },
   nav: {
     admin: '管理后台',
@@ -289,6 +290,7 @@ export const zh = {
     organizations: {
       title: '组织架构管理',
       subtitle: '维护学校组织架构树状结构',
+      emptyHint: '点击右上角"添加组织"按钮创建组织',
       stats: {
         total: '组织总数',
         root: '根节点',
@@ -302,11 +304,24 @@ export const zh = {
         students: '学生人数',
         parent: '上级组织',
         level: '层级',
-        path: '路径'
+        path: '路径',
+        creator: '创建者',
+        createdAt: '创建时间',
+        updater: '最后更新人',
+        updatedAt: '最后更新时间',
+        actions: '操作'
+      },
+      viewMode: {
+        list: '列表',
+        tree: '组织结构',
+        switchToTree: '展现形式：组织结构',
+        switchToList: '展现形式：列表'
       },
       addTitle: '添加组织',
       editTitle: '编辑组织',
+      addChild: '添加下级组织',
       selectParent: '选择上级组织',
+      selectParentHint: '选择上级组织，留空则设为根节点',
       rootNode: '根节点',
       noParent: '无上级（根节点）',
       hasChildren: '该组织下有子组织，无法删除',
@@ -314,6 +329,10 @@ export const zh = {
       deleteError: {
         hasChildren: '无法删除组织：该组织下有子组织，请先删除或移动这些子组织后再试。',
         hasMajors: '无法删除组织：该组织或其子组织下已有关联的专业，请先删除或重新分配这些专业后再试。'
+      },
+      deleteConfirm: {
+        title: '确认删除',
+        message: '确定要删除这个组织吗？此操作不可撤销。'
       }
     },
     dictionary: {
