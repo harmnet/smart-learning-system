@@ -3,27 +3,43 @@ import apiClient from '@/lib/api-client';
 export interface Major {
   id: number;
   name: string;
+  code?: string | null;
   description?: string;
   tuition_fee: number;
   duration_years: number;
   organization_id: number;
   organization_name?: string;
+  teacher_id?: number | null;
+  teacher_name?: string | null;
+  classes_count?: number;
+  students_count?: number;
+  total_tuition?: number;
 }
 
 export interface MajorCreate {
   name: string;
+  code?: string | null;
   description?: string;
   tuition_fee: number;
   duration_years: number;
   organization_id: number;
+  teacher_id?: number | null;
 }
 
 export interface MajorUpdate {
   name?: string;
+  code?: string | null;
   description?: string;
   tuition_fee?: number;
   duration_years?: number;
   organization_id?: number;
+  teacher_id?: number | null;
+}
+
+export interface Teacher {
+  id: number;
+  username: string;
+  phone?: string;
 }
 
 export interface MajorStats {
@@ -82,6 +98,11 @@ export const majorService = {
     const formData = new FormData();
     formData.append('file', file);
     const response = await apiClient.post('/majors/import', formData);
+    return response.data;
+  },
+
+  searchTeachers: async (search?: string): Promise<Teacher[]> => {
+    const response = await apiClient.get<Teacher[]>('/majors/teachers', { params: { search } });
     return response.data;
   },
 };

@@ -79,6 +79,7 @@ class TeachingResourceResponse(BaseModel):
 class TeachingResourceUpdate(BaseModel):
     resource_name: Optional[str] = None
     knowledge_point: Optional[str] = None
+    folder_id: Optional[int] = None
 
 def get_resource_type_from_filename(filename: str) -> Optional[str]:
     """根据文件名获取资源类型"""
@@ -193,6 +194,15 @@ async def upload_resource(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """上传教学资源"""
+    # 检查文件名
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="文件名不能为空"
+        )
+    
+    logging.info(f"上传文件: {file.filename}, 类型: {file.content_type}")
+    
     # 检查文件大小
     file_content = await file.read()
     file_size = len(file_content)
@@ -206,6 +216,7 @@ async def upload_resource(
     # 确定资源类型
     resource_type = get_resource_type_from_filename(file.filename)
     if not resource_type:
+        logging.error(f"不支持的文件类型: {file.filename}, 扩展名: {Path(file.filename).suffix.lower()}")
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件类型。支持的类型: {', '.join(RESOURCE_TYPES.keys())}"
@@ -344,6 +355,8 @@ async def update_resource(
         resource.resource_name = resource_update.resource_name
     if resource_update.knowledge_point is not None:
         resource.knowledge_point = resource_update.knowledge_point
+    if resource_update.folder_id is not None:
+        resource.folder_id = resource_update.folder_id
     
     resource.updated_at = datetime.utcnow()
     await db.commit()
@@ -603,6 +616,94 @@ async def get_pdf(
             'Cache-Control': 'public, max-age=3600',
         }
     )
+
+@router.get("/{resource_id}/weboffice-url")
+async def get_weboffice_preview_url(
+    resource_id: int,
+    expires: int = Query(3600, description="URL有效期（秒），默认3600秒（1小时）"),
+    allow_export: bool = Query(True, description="是否允许导出"),
+    allow_print: bool = Query(True, description="是否允许打印"),
+    watermark: Optional[str] = Query(None, description="水印文字（可选）"),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    获取WebOffice在线预览URL
+    仅支持Word、Excel、PPT、PDF文件
+    """
+    result = await db.execute(
+        select(TeachingResource).where(
+            TeachingResource.id == resource_id,
+            TeachingResource.is_active == True
+        )
+    )
+    resource = result.scalars().first()
+    
+    if not resource:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    
+    # 检查资源类型是否支持WebOffice预览
+    supported_types = ['word', 'excel', 'ppt', 'pdf']
+    if resource.resource_type.lower() not in supported_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型。WebOffice仅支持: {', '.join(supported_types)}"
+        )
+    
+    # 确保OSS已启用
+    if not oss_client.enabled:
+        raise HTTPException(
+            status_code=503,
+            detail="OSS服务未配置，无法生成预览URL"
+        )
+    
+    # 检查文件是否在OSS中
+    if not (resource.file_path.startswith('http://') or resource.file_path.startswith('https://')):
+        raise HTTPException(
+            status_code=400,
+            detail="文件未上传到OSS，无法使用WebOffice预览"
+        )
+    
+    try:
+        # 从OSS URL中提取object_key
+        oss_key = None
+        if '.aliyuncs.com/' in resource.file_path:
+            parts = resource.file_path.split('.aliyuncs.com/')
+            if len(parts) > 1:
+                oss_key = parts[1].split('?')[0]
+        elif settings.OSS_USE_CNAME and settings.OSS_ENDPOINT:
+            if resource.file_path.startswith(settings.OSS_ENDPOINT):
+                oss_key = resource.file_path.replace(settings.OSS_ENDPOINT + '/', '').split('?')[0]
+        
+        if not oss_key:
+            raise HTTPException(
+                status_code=400,
+                detail="无法从文件路径提取OSS对象键"
+            )
+        
+        # 生成WebOffice预览URL
+        preview_url = oss_client.generate_weboffice_preview_url(
+            object_key=oss_key,
+            expires=expires,
+            allow_export=allow_export,
+            allow_print=allow_print,
+            watermark_text=watermark
+        )
+        
+        return {
+            "success": True,
+            "preview_url": preview_url,
+            "resource_id": resource_id,
+            "resource_name": resource.resource_name,
+            "resource_type": resource.resource_type,
+            "expires_in": expires
+        }
+    
+    except Exception as e:
+        logging.error(f"生成WebOffice预览URL失败: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"生成预览URL失败: {str(e)}"
+        )
 
 @router.get("/{resource_id}/preview")
 async def preview_resource(

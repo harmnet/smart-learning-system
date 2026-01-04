@@ -54,6 +54,7 @@ export const zh = {
     organizations: '组织管理',
     teachers: '教师管理',
     students: '学生管理',
+    users: '用户管理',
     majors: '专业管理',
     classes: '班级管理',
     dictionary: '数据字典',
@@ -100,6 +101,7 @@ export const zh = {
       addTitle: '添加新学生',
       editTitle: '编辑学生信息',
       selectClass: '选择班级',
+      heatmap: '热力图',
       classFilter: {
         title: '筛选班级',
         major: '专业',
@@ -116,6 +118,7 @@ export const zh = {
         avgSize: '平均班额'
       },
       students: '学生列表',
+      viewStudents: '查看班级学生',
       columns: {
         name: '班级名称',
         code: '班级代码',
@@ -129,6 +132,34 @@ export const zh = {
       editTitle: '编辑班级信息',
       deleteError: {
         hasStudents: '无法删除班级：该班级下已有有效学生，请先删除或重新分配这些学生后再试。'
+      },
+      overview: {
+        title: '班级一览',
+        subtitle: '可视化展示所有专业、年级和班级的关系',
+        noData: '暂无班级数据',
+        noDataHint: '请先在班级管理中添加班级',
+        major: '专业',
+        grade: '年级',
+        class: '班级',
+        classCode: '班级代码',
+        tip: '💡 提示：可以拖动画布、缩放、拖动节点，鼠标悬停查看详情'
+      },
+      heatmap: {
+        title: '班级分布热力图',
+        subtitle: '按专业和年级查看班级分布情况',
+        legend: '颜色图例（按学生人数）',
+        students: '人',
+        noClass: '暂无班级',
+        classDetails: '班级详情',
+        className: '班级名称',
+        major: '所属专业',
+        grade: '年级',
+        studentCount: '学生人数',
+        stats: {
+          majors: '专业总数',
+          classes: '班级总数',
+          students: '学生总数'
+        }
       }
     },
     teachers: {
@@ -195,6 +226,53 @@ export const zh = {
         }
       }
     },
+    users: {
+      title: '用户管理',
+      subtitle: '管理系统所有用户信息',
+      columns: {
+        name: '姓名',
+        username: '用户名',
+        phone: '手机号',
+        email: '邮箱',
+        role: '角色',
+        status: '状态',
+        actions: '操作'
+      },
+      roles: {
+        admin: '管理员',
+        teacher: '教师',
+        student: '学生'
+      },
+      filters: {
+        name: '姓名',
+        username: '用户名',
+        phone: '手机号',
+        search: '搜索',
+        reset: '重置'
+      },
+      actions: {
+        changePassword: '修改密码',
+        resetPassword: '重置密码'
+      },
+      changePassword: {
+        title: '修改密码',
+        currentPassword: '当前密码',
+        newPassword: '新密码',
+        confirmPassword: '确认密码',
+        submit: '确认修改',
+        success: '密码修改成功',
+        error: '密码修改失败'
+      },
+      resetPassword: {
+        title: '重置密码',
+        warning: '确认重置密码',
+        confirmMessage: '此操作将会重置该用户的登录密码为"111111"。请确认是否继续？',
+        confirm: '确认重置',
+        success: '密码重置成功',
+        successMessage: '密码已重置为：111111',
+        error: '密码重置失败'
+      }
+    },
     majors: {
       title: '专业学科建设',
       subtitle: '管理学院专业设置、培养方案与学费',
@@ -210,7 +288,10 @@ export const zh = {
         organization: '所属组织',
         tuition: '学费标准',
         duration: '学制',
-        totalTuition: '总学费'
+        totalTuition: '总学费',
+        classesCount: '班级数量',
+        studentsCount: '学生数量',
+        teacher: '专业负责人'
       },
       addTitle: '添加新专业',
       editTitle: '编辑专业信息',
@@ -415,6 +496,7 @@ export const zh = {
       editGraph: '编辑图谱',
       deleteGraph: '删除图谱',
       createNode: '创建节点',
+      addChildNode: '添加子节点',
       editNode: '编辑节点',
       deleteNode: '删除节点',
       nodeName: '节点名称',
@@ -502,14 +584,17 @@ export const zh = {
         resourcesCount: '个资源',
       },
       types: {
-        all: '全部类型',
-        video: '视频',
-        ppt: '课件',
+        all: '全部',
+        video: 'MP4',
+        ppt: 'PPT',
         pdf: 'PDF',
         word: 'Word',
         excel: 'Excel',
-        markdown: 'Markdown',
+        markdown: 'MD',
         image: '图片',
+        zip: 'Zip',
+        txt: 'TXT',
+        question: '试题',
       },
       stats: {
         total: '总资源数',
@@ -551,6 +636,34 @@ export const zh = {
         noFolders: '暂无文件夹',
         backToParent: '返回上级',
         currentPath: '当前位置',
+        folderColumn: '文件夹',
+        noFolder: '根目录',
+      },
+      table: {
+        name: '资源名称',
+        type: '类型',
+        size: '大小',
+        knowledgePoint: '知识点',
+        folder: '文件夹',
+        uploadTime: '上传时间',
+        actions: '操作',
+        noData: '暂无资源数据',
+        selectFolderOrNode: '请选择文件夹或知识点查看资源',
+      },
+      filter: {
+        type: '类型筛选',
+        all: '全部',
+      },
+      sort: {
+        time: '时间',
+        name: '名称',
+      },
+      pagination: {
+        total: '共',
+        items: '条',
+        page: '页',
+        perPage: '每页',
+        rows: '条',
       }
     },
     referenceMaterials: {

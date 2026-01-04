@@ -212,7 +212,11 @@ async def test_openai_compatible(config: LLMConfig, message: str) -> str:
     测试OpenAI兼容的API（DeepSeek, KIMI, SiliconFlow, 火山引擎等）
     """
     endpoint = config.endpoint_url.rstrip('/') if config.endpoint_url else ""
-    url = f"{endpoint}/chat/completions"
+    # 如果endpoint已经包含/chat/completions，就不需要再拼接
+    if endpoint.endswith('/chat/completions'):
+        url = endpoint
+    else:
+        url = f"{endpoint}/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {config.api_key}",

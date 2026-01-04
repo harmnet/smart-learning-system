@@ -59,10 +59,12 @@ async def get_user_name(user_id: Optional[int], db: AsyncSession) -> Optional[st
 
 class OrganizationCreate(BaseModel):
     name: str
+    code: Optional[str] = None
     parent_id: Optional[int] = None
 
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
+    code: Optional[str] = None
     parent_id: Optional[int] = None
 
 def get_all_descendant_ids(org_id: int, org_dict: dict) -> set:
@@ -132,6 +134,7 @@ async def get_organizations(
     org_dict = {org.id: {
         "id": org.id,
         "name": org.name,
+        "code": org.code,
         "parent_id": org.parent_id,
         "created_by": org.created_by,
         "updated_by": org.updated_by,
@@ -196,6 +199,7 @@ async def get_organizations(
                 org_dict[org.id] = {
                     "id": org.id,
                     "name": org.name,
+                    "code": org.code,
                     "parent_id": org.parent_id,
                     "created_by": org.created_by,
                     "updated_by": org.updated_by,
@@ -238,6 +242,7 @@ async def get_organizations(
             result_list.append({
                 "id": node["id"],
                 "name": node["name"],
+                "code": node.get("code"),
                 "parent_id": node["parent_id"],
                 "level": 0,  # Will be calculated
                 "majors_count": node.get("majors_count", 0),
@@ -287,6 +292,7 @@ async def get_organization_tree(
     org_dict = {org.id: {
         "id": org.id,
         "name": org.name,
+        "code": org.code,
         "parent_id": org.parent_id,
         "children": []
     } for org in all_orgs}
@@ -476,6 +482,7 @@ async def get_organization(
     return {
         "id": org.id,
         "name": org.name,
+        "code": org.code,
         "parent_id": org.parent_id,
         "majors_count": stats["majors_count"],
         "classes_count": stats["classes_count"],
@@ -512,6 +519,7 @@ async def create_organization(
     
     org = Organization(
         name=org_in.name,
+        code=org_in.code,
         parent_id=org_in.parent_id,
         created_by=current_user.id,
         updated_by=current_user.id
@@ -523,6 +531,7 @@ async def create_organization(
     return {
         "id": org.id,
         "name": org.name,
+        "code": org.code,
         "parent_id": org.parent_id
     }
 
@@ -576,6 +585,9 @@ async def update_organization(
     
     if org_in.name is not None:
         org.name = org_in.name
+    if org_in.code is not None:
+        # 只在code有实际内容时才更新，空字符串设置为None
+        org.code = org_in.code.strip() if org_in.code.strip() else None
     # Only update parent_id if it was explicitly provided
     if hasattr(org_in, '__fields_set__') and 'parent_id' in org_in.__fields_set__:
         if org_in.parent_id is not None:
@@ -593,6 +605,7 @@ async def update_organization(
     return {
         "id": org.id,
         "name": org.name,
+        "code": org.code,
         "parent_id": org.parent_id
     }
 

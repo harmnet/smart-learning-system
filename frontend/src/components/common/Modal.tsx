@@ -71,7 +71,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', m
 
           {/* Content */}
           <div 
-            className="overflow-y-auto"
+            className="overflow-y-auto px-6 py-4"
             style={{ maxHeight: maxHeight || 'calc(100vh - 200px)' }}
           >
             {children}

@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@antv/g6": "^5.0.51",
+    "@antv/graphin": "^3.0.5",
+    "@antv/graphin-components": "^2.4.1",
     "antd": "^5.11.0",
     "axios": "^1.6.0",
     "clsx": "^2.0.0",

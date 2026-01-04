@@ -141,21 +141,26 @@ export default function TeacherSidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
-      {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">T</span>
+    <aside className="w-64 h-screen bg-white flex flex-col fixed left-0 top-0 z-50 border-r border-neutral-100">
+      {/* Welcome Message */}
+      <div className="h-16 flex items-center px-6 mb-6 mt-2">
+        <div className="flex items-center gap-3 text-neutral-900">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-blue-200 shadow-lg">
+            {userInfo?.full_name ? userInfo.full_name.charAt(0).toUpperCase() : 'T'}
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-900">{t.nav.teacher}</div>
+            <div className="text-sm text-neutral-500 font-medium">
+              {t.nav.teacher === 'Teacher' ? 'Welcome' : '欢迎'}
+            </div>
+            <div className="text-lg font-bold tracking-tight">
+              {userInfo?.full_name || userInfo?.username || 'Teacher'}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Menu Items */}
-      <nav className="flex-1 overflow-y-auto py-4">
+      <nav className="flex-1 overflow-y-auto px-3">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -163,10 +168,10 @@ export default function TeacherSidebar() {
               key={item.href}
               onClick={() => router.push(item.href)}
               className={`
-                w-full flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors
+                w-full flex items-center gap-3 px-4 py-3 mb-1 rounded-xl text-sm font-medium transition-all
                 ${isActive 
-                  ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600' 
-                  : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
+                  ? 'text-blue-600 bg-blue-50 shadow-sm' 
+                  : 'text-neutral-600 hover:text-blue-600 hover:bg-neutral-50'
                 }
               `}
             >
@@ -176,41 +181,6 @@ export default function TeacherSidebar() {
           );
         })}
       </nav>
-
-      {/* User Info & Logout */}
-      <div className="border-t border-slate-200 p-4 space-y-3">
-        {/* User Info */}
-        {userInfo && (
-          <div className="px-4 py-3 bg-slate-50 rounded-lg">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">
-                  {userInfo.full_name ? userInfo.full_name.charAt(0).toUpperCase() : 'T'}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900 truncate">
-                  {userInfo.full_name || userInfo.username}
-                </div>
-                <div className="text-xs text-slate-500 truncate">
-                  {userInfo.phone || userInfo.username}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Logout Button */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span>{t.common.logout}</span>
-        </button>
-      </div>
     </aside>
   );
 }

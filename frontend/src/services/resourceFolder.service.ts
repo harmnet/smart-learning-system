@@ -24,6 +24,16 @@ export interface FolderUpdate {
   description?: string;
 }
 
+export interface FolderTreeNode {
+  id: number;
+  folder_name: string;
+  parent_id?: number;
+  description?: string;
+  resource_count: number;
+  subfolder_count: number;
+  children: FolderTreeNode[];
+}
+
 class ResourceFolderService {
   private API_BASE_URL = '/teacher/folders';
 
@@ -99,6 +109,28 @@ class ResourceFolderService {
       `${this.API_BASE_URL}/resources/${resourceId}/move`,
       null,
       { params }
+    );
+    return response.data;
+  }
+
+  /**
+   * 获取文件夹树形结构
+   */
+  async getFolderTree(teacherId: number): Promise<FolderTreeNode[]> {
+    const response = await apiClient.get<FolderTreeNode[]>(
+      `${this.API_BASE_URL}/tree`,
+      { params: { teacher_id: teacherId } }
+    );
+    return response.data;
+  }
+
+  /**
+   * 递归获取文件夹及其所有子文件夹的资源
+   */
+  async getFolderResourcesRecursive(folderId: number, teacherId: number): Promise<any> {
+    const response = await apiClient.get(
+      `${this.API_BASE_URL}/${folderId}/resources-recursive`,
+      { params: { teacher_id: teacherId } }
     );
     return response.data;
   }

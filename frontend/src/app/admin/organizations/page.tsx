@@ -9,6 +9,29 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import BulkImportModal from '@/components/admin/BulkImportModal';
 import AdminLayout from '@/components/admin/AdminLayout';
 
+// 拼音首字母生成函数
+const generatePinyinCode = (text: string): string => {
+  // 简化版拼音首字母映射（仅包含常用汉字）
+  const pinyinMap: { [key: string]: string } = {
+    '默': 'M', '认': 'R', '学': 'X', '校': 'X',
+    '计': 'J', '算': 'S', '机': 'J', '院': 'Y',
+    '会': 'H', '管': 'G', '理': 'L', '教': 'J', '研': 'Y', '室': 'S',
+    '应': 'Y', '用': 'Y', '软': 'R', '件': 'J', '工': 'G', '程': 'C',
+    '金': 'J', '融': 'R', '服': 'F', '务': 'W', '与': 'Y',
+    '科': 'K', '技': 'J', '国': 'G', '际': 'J',
+  };
+  
+  let code = '';
+  for (let char of text) {
+    if (pinyinMap[char]) {
+      code += pinyinMap[char];
+    } else if (/[A-Za-z]/.test(char)) {
+      code += char.toUpperCase();
+    }
+  }
+  return code || 'ORG';
+};
+
 export default function AdminOrganizationsPage() {
   const { t } = useLanguage();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -23,11 +46,13 @@ export default function AdminOrganizationsPage() {
   
   const [addForm, setAddForm] = useState<OrganizationCreate>({
     name: '',
+    code: '',
     parent_id: null
   });
 
   const [editForm, setEditForm] = useState<OrganizationUpdate>({
     name: '',
+    code: '',
     parent_id: null
   });
 
@@ -103,6 +128,7 @@ export default function AdminOrganizationsPage() {
     setEditingOrg(org);
     setEditForm({
       name: org.name,
+      code: org.code || '',
       parent_id: org.parent_id
     });
     setEditModalOpen(true);
@@ -111,6 +137,7 @@ export default function AdminOrganizationsPage() {
   const handleAddChild = (parentOrg: Organization) => {
     setAddForm({
       name: '',
+      code: '',
       parent_id: parentOrg.id
     });
     setAddModalOpen(true);
@@ -123,6 +150,7 @@ export default function AdminOrganizationsPage() {
       setAddModalOpen(false);
       setAddForm({
         name: '',
+        code: '',
         parent_id: null
       });
       setToast({ message: t.common.success, type: 'success' });
@@ -155,23 +183,23 @@ export default function AdminOrganizationsPage() {
       message: t.admin.organizations.deleteConfirm.message || t.common.confirm + '?',
       onConfirm: async () => {
         setConfirmDialog(null);
-        try {
-          await organizationService.delete(orgId);
+    try {
+      await organizationService.delete(orgId);
           setToast({ message: t.common.deleteSuccess || t.common.success, type: 'success' });
-          loadOrganizations();
-        } catch (err: any) {
-          console.error('Failed to delete organization:', err);
-          const errorMessage = err.response?.data?.detail || err.message || t.common.error;
-          
-          // 检查是否是有关联专业的错误
-          if (errorMessage.includes('major') || errorMessage.includes('专业') || (errorMessage.includes('associated') && errorMessage.includes('major'))) {
+      loadOrganizations();
+    } catch (err: any) {
+      console.error('Failed to delete organization:', err);
+      const errorMessage = err.response?.data?.detail || err.message || t.common.error;
+      
+      // 检查是否是有关联专业的错误
+      if (errorMessage.includes('major') || errorMessage.includes('专业') || (errorMessage.includes('associated') && errorMessage.includes('major'))) {
             setToast({ message: t.admin.organizations.deleteError.hasMajors, type: 'error' });
-          }
-          // 检查是否是有关联子组织的错误
-          else if (errorMessage.includes('children') || errorMessage.includes('子组织')) {
+      }
+      // 检查是否是有关联子组织的错误
+      else if (errorMessage.includes('children') || errorMessage.includes('子组织')) {
             setToast({ message: t.admin.organizations.deleteError.hasChildren, type: 'error' });
-          }
-          else {
+      }
+      else {
             setToast({ message: t.common.error + ': ' + errorMessage, type: 'error' });
           }
         }
@@ -252,65 +280,50 @@ export default function AdminOrganizationsPage() {
 
     return (
       <div className="inline-block">
-        <div className={`bg-gradient-to-br ${gradientClass} rounded-2xl p-1 shadow-lg hover:shadow-xl transition-all`}>
-          <div className="bg-white rounded-xl p-4 min-w-[220px] max-w-[260px]">
-            {/* 图标和标题 */}
-            <div className="flex items-start gap-2 mb-3">
-              <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center flex-shrink-0`}>
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+        <div className={`bg-gradient-to-br ${gradientClass} rounded-xl shadow-sm hover:shadow-md transition-all`}>
+          <div className="bg-white rounded-lg p-2.5 min-w-[140px] max-w-[180px]">
+            {/* 组织名称 */}
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-6 h-6 rounded-md bg-gradient-to-br ${gradientClass} flex items-center justify-center flex-shrink-0`}>
+                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                 </svg>
               </div>
-              <h3 className="text-sm font-bold text-slate-900 flex-1 line-clamp-2 leading-tight">{node.name}</h3>
-            </div>
-
-            {/* 统计信息 */}
-            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-              <div className="text-center p-1 bg-slate-50 rounded">
-                <div className="font-bold text-slate-900">{node.majors_count || 0}</div>
-                <div className="text-slate-500 text-[10px]">专业</div>
-              </div>
-              <div className="text-center p-1 bg-slate-50 rounded">
-                <div className="font-bold text-slate-900">{node.classes_count || 0}</div>
-                <div className="text-slate-500 text-[10px]">班级</div>
-              </div>
-              <div className="text-center p-1 bg-slate-50 rounded">
-                <div className="font-bold text-slate-900">{node.students_count || 0}</div>
-                <div className="text-slate-500 text-[10px]">学生</div>
-              </div>
+              <h3 className="text-xs font-bold text-slate-900 flex-1 line-clamp-2 leading-tight">{node.name}</h3>
             </div>
 
             {/* 操作按钮 */}
-            <div className="flex items-center justify-center gap-1 pt-2 border-t border-slate-100">
-              <button onClick={() => handleView(node)} className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors" title="查看">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <div className="flex items-center justify-center gap-1">
+              <button onClick={() => handleView(node)} className="p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors" title={t.common.view}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
               </button>
-              <button onClick={() => handleAddChild(node)} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title="添加下级">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <button onClick={() => handleAddChild(node)} className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors" title={t.admin.organizations.addChild}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </button>
-              <button onClick={() => handleEdit(node)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="编辑">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+              <button onClick={() => handleEdit(node)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title={t.common.edit}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
               </button>
-              <button onClick={() => handleDelete(node.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title="删除">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+              <button onClick={() => handleDelete(node.id)} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title={t.common.delete}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
               </button>
             </div>
           </div>
 
           {/* 展开/收起按钮 */}
           {hasChildren && (
-            <div className="flex justify-center -mb-3 mt-1">
+            <div className="flex justify-center -mb-2 mt-1">
               <button
                 onClick={() => toggleNode(node.id)}
-                className="w-6 h-6 rounded-full bg-white shadow-md hover:shadow-lg flex items-center justify-center transition-all hover:scale-110 z-10 relative"
+                className="w-5 h-5 rounded-full bg-white shadow-sm hover:shadow-md flex items-center justify-center transition-all hover:scale-110 z-10 relative border border-slate-200"
               >
                 <svg
-                  className={`w-3.5 h-3.5 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`w-3 h-3 text-slate-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  strokeWidth="2.5"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
             </div>
@@ -337,21 +350,61 @@ export default function AdminOrganizationsPage() {
       ];
       const colorClass = levelColors[Math.min(level, levelColors.length - 1)];
 
+      const childrenArray = node.children || [];
+      const childCount = childrenArray.length;
+
       return (
-        <div key={node.id} className="flex flex-col items-center mb-4">
+        <div key={node.id} className="flex flex-col items-center">
           {/* 节点卡片 */}
           {renderOrgCard(node, level)}
 
           {/* 子节点区域 */}
           {hasChildren && isExpanded && (
-            <div className="relative mt-6">
-              {/* 连接线：从父节点向下 */}
-              <div className="absolute left-1/2 -translate-x-1/2 -top-6 w-0.5 h-6 bg-gradient-to-b from-slate-300 to-slate-400"></div>
+            <div className="relative mt-8 mb-8">
+              {/* 从父节点向下到T字路口的垂直线 */}
+              <div className="absolute left-1/2 -translate-x-1/2 -top-8 w-0.5 h-8 bg-slate-400"></div>
               
-              {/* 子节点横向排列 */}
-              <div className="flex gap-6 items-start justify-center">
-                {renderTreeNodes(node.children!, level + 1)}
-              </div>
+              {childCount === 1 ? (
+                // 单个子节点：只有一条垂直线
+                <div className="flex justify-center">
+                  {renderTreeNodes(childrenArray, level + 1)}
+                </div>
+              ) : (
+                // 多个子节点：T字形连接
+                <div className="relative pt-6">
+                  {/* 子节点横向排列 */}
+                  <div className="flex gap-6 items-start justify-center pt-6">
+                    {childrenArray.map((child, index) => {
+                      const isFirst = index === 0;
+                      const isLast = index === childCount - 1;
+                      const isMiddle = !isFirst && !isLast;
+                      
+                      return (
+                        <div key={child.id} className="relative">
+                          {/* 从水平线向下到子节点的垂直线 */}
+                          <div className="absolute left-1/2 -translate-x-1/2 -top-6 w-0.5 h-6 bg-slate-400"></div>
+                          
+                          {/* 水平连接线段 */}
+                          {isFirst && childCount > 1 && (
+                            // 第一个节点：从中心向右
+                            <div className="absolute -top-6 left-1/2 h-0.5 bg-slate-400" style={{ width: 'calc(100% + 1.5rem)' }}></div>
+                          )}
+                          {isMiddle && (
+                            // 中间节点：横跨整个宽度
+                            <div className="absolute -top-6 h-0.5 bg-slate-400" style={{ left: '-1.5rem', right: '-1.5rem' }}></div>
+                          )}
+                          {isLast && childCount > 1 && (
+                            // 最后一个节点：从左侧到中心
+                            <div className="absolute -top-6 right-1/2 h-0.5 bg-slate-400" style={{ width: 'calc(100% + 1.5rem)' }}></div>
+                          )}
+                          
+                          {renderTreeNodes([child], level + 1)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -363,9 +416,31 @@ export default function AdminOrganizationsPage() {
     <div className="h-full flex flex-col">
       {/* Page Header */}
       <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{t.admin.organizations.title}</h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">{t.admin.organizations.subtitle}</p>
+          </div>
+          <button 
+            onClick={() => setViewMode(viewMode === 'list' ? 'tree' : 'list')}
+            className="px-6 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-full font-bold text-sm transition-all flex items-center gap-2 active:scale-95"
+          >
+            {viewMode === 'list' ? (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                </svg>
+                {t.admin.organizations.viewMode.switchToTree}
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                {t.admin.organizations.viewMode.switchToList}
+              </>
+            )}
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {/* 搜索输入框 */}
@@ -391,26 +466,6 @@ export default function AdminOrganizationsPage() {
               </button>
             )}
           </div>
-          <button 
-            onClick={() => setViewMode(viewMode === 'list' ? 'tree' : 'list')}
-            className="px-6 py-3 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-full font-bold text-sm transition-all flex items-center gap-2 active:scale-95"
-          >
-            {viewMode === 'list' ? (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                </svg>
-                {t.admin.organizations.viewMode.switchToTree}
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                </svg>
-                {t.admin.organizations.viewMode.switchToList}
-              </>
-            )}
-          </button>
           <button 
             onClick={() => setImportModalOpen(true)}
             className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full font-bold text-sm transition-all flex items-center gap-2 active:scale-95"
@@ -509,7 +564,7 @@ export default function AdminOrganizationsPage() {
                             <div className="w-6 h-px bg-slate-300"></div>
                             {/* 层级图标 */}
                             <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                           </div>
                         )}
@@ -518,7 +573,10 @@ export default function AdminOrganizationsPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                           </svg>
                         )}
-                        <div className={`text-sm font-bold ${org.level === 0 ? 'text-blue-900' : 'text-slate-900'}`}>{org.name}</div>
+                        <div className={`text-sm font-bold ${org.level === 0 ? 'text-blue-900' : 'text-slate-900'}`}>
+                          {org.name}
+                          {org.code && <span className="ml-1 text-slate-500 font-normal">({org.code})</span>}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -689,25 +747,52 @@ export default function AdminOrganizationsPage() {
             </div>
             <form onSubmit={handleAddSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">{t.admin.organizations.columns.name} *</label>
-                <input type="text" className={inputStyle} value={addForm.name} onChange={(e) => setAddForm({...addForm, name: e.target.value})} required />
+                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">
+                  {t.admin.organizations.columns.name} <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  className={inputStyle} 
+                  value={addForm.name} 
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setAddForm({
+                      ...addForm, 
+                      name: newName,
+                      code: generatePinyinCode(newName)
+                    });
+                  }} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">
+                  组织编码
+                </label>
+                <input 
+                  type="text" 
+                  className={inputStyle} 
+                  value={addForm.code || ''} 
+                  onChange={(e) => setAddForm({...addForm, code: e.target.value})}
+                  placeholder="自动生成，可修改"
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">{t.admin.organizations.columns.parent}</label>
                 <div className="relative">
-                  <select 
+                <select 
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm hover:border-slate-300 cursor-pointer"
                     style={selectInlineStyle}
-                    value={addForm.parent_id || ''}
-                    onChange={(e) => setAddForm({...addForm, parent_id: e.target.value ? parseInt(e.target.value) : null})}
-                  >
+                  value={addForm.parent_id || ''}
+                  onChange={(e) => setAddForm({...addForm, parent_id: e.target.value ? parseInt(e.target.value) : null})}
+                >
                     <option value="" className="py-2">{t.admin.organizations.noParent}</option>
-                    {allOrgsFlat.map((org) => (
+                  {allOrgsFlat.map((org) => (
                       <option key={org.id} value={org.id} className="py-2">
                         {org.level === 0 ? '[根] ' : `[L${org.level}] ${'　'.repeat(org.level)}├─ `}{org.name}
-                      </option>
-                    ))}
-                  </select>
+                    </option>
+                  ))}
+                </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
                     <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
@@ -741,25 +826,52 @@ export default function AdminOrganizationsPage() {
             </div>
             <form onSubmit={handleEditSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">{t.admin.organizations.columns.name}</label>
-                <input type="text" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} className={inputStyle} />
+                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">
+                  {t.admin.organizations.columns.name} <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  value={editForm.name} 
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setEditForm({
+                      ...editForm, 
+                      name: newName,
+                      code: generatePinyinCode(newName)
+                    });
+                  }} 
+                  className={inputStyle} 
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">
+                  组织编码
+                </label>
+                <input 
+                  type="text" 
+                  className={inputStyle} 
+                  value={editForm.code || ''} 
+                  onChange={(e) => setEditForm({...editForm, code: e.target.value})}
+                  placeholder="自动生成，可修改"
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">{t.admin.organizations.columns.parent}</label>
                 <div className="relative">
-                  <select 
+                <select 
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm hover:border-slate-300 cursor-pointer"
                     style={selectInlineStyle}
-                    value={editForm.parent_id || ''}
-                    onChange={(e) => setEditForm({...editForm, parent_id: e.target.value ? parseInt(e.target.value) : null})}
-                  >
+                  value={editForm.parent_id || ''}
+                  onChange={(e) => setEditForm({...editForm, parent_id: e.target.value ? parseInt(e.target.value) : null})}
+                >
                     <option value="" className="py-2">{t.admin.organizations.noParent}</option>
-                    {allOrgsFlat.filter(o => o.id !== editingOrg.id).map((org) => (
+                  {allOrgsFlat.filter(o => o.id !== editingOrg.id).map((org) => (
                       <option key={org.id} value={org.id} className="py-2">
                         {org.level === 0 ? '[根] ' : `[L${org.level}] ${'　'.repeat(org.level)}├─ `}{org.name}
-                      </option>
-                    ))}
-                  </select>
+                    </option>
+                  ))}
+                </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
                     <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
@@ -795,6 +907,10 @@ export default function AdminOrganizationsPage() {
               <div>
                 <label className="block text-sm font-bold text-slate-400 mb-2">{t.admin.organizations.columns.name}</label>
                 <p className="text-base font-semibold text-slate-900">{viewingOrg.name}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-400 mb-2">组织编码</label>
+                <p className="text-base text-slate-700">{viewingOrg.code || '-'}</p>
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-400 mb-2">{t.admin.organizations.columns.parent}</label>

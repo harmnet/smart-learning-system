@@ -67,8 +67,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
                 <svg className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
+              </svg>
+            </button>
 
               {/* Dropdown Menu */}
               {showUserMenu && (

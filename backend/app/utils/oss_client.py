@@ -3,6 +3,7 @@
 用于文件上传和生成WebOffice预览URL
 """
 import logging
+import base64
 from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import quote
@@ -119,9 +120,11 @@ class OSSClient:
         
         # 如果设置了水印，添加水印参数
         # watermark,text_水印文字,size_字号,t_透明度
+        # 注意：阿里云OSS要求水印文本必须是Base64编码
         if watermark_text:
-            # URL编码水印文字
-            encoded_text = quote(watermark_text)
+            # Base64编码水印文字
+            encoded_bytes = base64.b64encode(watermark_text.encode('utf-8'))
+            encoded_text = encoded_bytes.decode('utf-8')
             process_params += f"/watermark,text_{encoded_text},size_30,t_60"
         
         # 生成签名URL

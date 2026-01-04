@@ -65,16 +65,33 @@ export default function LoginPage() {
       console.error('Login failed:', err);
       console.error('Error details:', err.response);
       
-      let errorMessage = '登录失败，请检查用户名和密码';
+      let errorMessage = '登录失败，请稍后重试';
       
-      if (err.message) {
-        errorMessage = err.message;
+      // 优先根据HTTP状态码判断错误类型
+      if (err.response?.status === 401) {
+        // 401: 用户名或密码错误
+        errorMessage = '用户名或密码错误，请重新输入';
+      } else if (err.response?.status === 403) {
+        // 403: 账号被禁用
+        errorMessage = '账号已被禁用，请联系管理员';
+      } else if (err.response?.status === 404) {
+        // 404: 用户不存在
+        errorMessage = '用户不存在，请检查用户名';
+      } else if (err.response?.status === 429) {
+        // 429: 请求过于频繁
+        errorMessage = '登录尝试过于频繁，请稍后再试';
+      } else if (err.response?.status >= 500) {
+        // 500+: 服务器错误
+        errorMessage = '服务器错误，请稍后重试';
       } else if (err.response?.data?.detail) {
+        // 如果后端返回了具体的错误信息
         errorMessage = err.response.data.detail;
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        errorMessage = '请求超时，请检查网络连接或后端服务是否正常运行';
+        // 请求超时
+        errorMessage = '请求超时，请检查网络连接';
       } else if (!err.response) {
-        errorMessage = '网络错误，请检查后端服务是否正常运行（http://localhost:8000）';
+        // 网络错误
+        errorMessage = '无法连接到服务器，请检查网络连接';
       }
       
       setError(errorMessage);
@@ -94,13 +111,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Brand & Visual */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 overflow-hidden">
-        {/* 装饰背景 */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-400/30 rounded-full blur-3xl animate-float"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-400/30 rounded-full blur-3xl" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white/10 rounded-full"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white/10 rounded-full"></div>
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        {/* 背景图片 */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/images/login_bg.png')" }}
+        >
+          {/* 深色遮罩层以确保文字可读 */}
+          <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/50 to-black/40"></div>
         </div>
         
         {/* 内容 */}
@@ -163,11 +181,7 @@ export default function LoginPage() {
           <div className="bg-white rounded-3xl shadow-2xl border border-neutral-100 p-10">
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-neutral-900 mb-2">账号登录</h2>
-              <p className="text-neutral-500">还没有账号？
-                <Link href="/auth/register" className="text-blue-600 font-semibold hover:text-blue-700 ml-1">
-                  立即注册
-                </Link>
-              </p>
+              <p className="text-neutral-500">欢迎使用智慧学习平台</p>
             </div>
 
             {error && (
@@ -255,49 +269,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-neutral-500">或使用其他方式登录</span>
-              </div>
-            </div>
-
-            {/* Social Login */}
-            <div className="grid grid-cols-2 gap-4">
-              <button className="flex items-center justify-center gap-2 py-3 px-4 border-2 border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all group">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
-                <span className="text-sm font-medium text-neutral-700 group-hover:text-neutral-900">GitHub</span>
-              </button>
-              <button className="flex items-center justify-center gap-2 py-3 px-4 border-2 border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all group">
-                <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8.691 2.188C7.099 2.188 5.785 3.515 5.785 5.12c0 1.606 1.314 2.933 2.906 2.933s2.906-1.327 2.906-2.933c0-1.605-1.314-2.932-2.906-2.932zm11.624 0C18.723 2.188 17.41 3.515 17.41 5.12c0 1.606 1.314 2.933 2.905 2.933 1.592 0 2.906-1.327 2.906-2.933 0-1.605-1.314-2.932-2.906-2.932zM8.691 8.982C7.099 8.982 5.785 10.31 5.785 11.915c0 1.606 1.314 2.933 2.906 2.933s2.906-1.327 2.906-2.933c0-1.605-1.314-2.933-2.906-2.933zm11.624 0c-1.592 0-2.906 1.328-2.906 2.933 0 1.606 1.314 2.933 2.906 2.933 1.592 0 2.906-1.327 2.906-2.933 0-1.605-1.314-2.933-2.906-2.933zM8.691 15.776c-1.592 0-2.906 1.328-2.906 2.934 0 1.605 1.314 2.932 2.906 2.932s2.906-1.327 2.906-2.932c0-1.606-1.314-2.934-2.906-2.934zm11.624 0c-1.592 0-2.906 1.328-2.906 2.934 0 1.605 1.314 2.932 2.906 2.932 1.592 0 2.906-1.327 2.906-2.932 0-1.606-1.314-2.934-2.906-2.934z"/>
-                </svg>
-                <span className="text-sm font-medium text-neutral-700 group-hover:text-neutral-900">微信</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Test Account Hint */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <div className="text-sm">
-                <div className="font-semibold text-blue-900 mb-1">测试账号</div>
-                <div className="text-blue-700 space-y-1">
-                  <div>管理员 - 用户名: <code className="bg-blue-100 px-2 py-0.5 rounded">admin</code> / 密码: <code className="bg-blue-100 px-2 py-0.5 rounded">admin123</code></div>
-                  <div>教师 - 手机号: <code className="bg-blue-100 px-2 py-0.5 rounded">13800138002</code> / 密码: <code className="bg-blue-100 px-2 py-0.5 rounded">12345678</code></div>
-                  <div className="text-xs text-blue-600 mt-2">💡 支持使用用户名或手机号登录</div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

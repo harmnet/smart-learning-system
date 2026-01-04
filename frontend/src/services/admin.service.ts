@@ -278,4 +278,15 @@ export const adminService = {
     const response = await apiClient.post('/admin/classes/import', formData);
     return response.data;
   },
+
+  // 用户管理
+  getAllUsers: async (params?: { name?: string; username?: string; phone?: string }): Promise<{ items: any[]; total: number }> => {
+    const response = await apiClient.get<{ items: any[]; total: number }>('/admin/users', { params });
+    return response.data;
+  },
+
+  resetUserPassword: async (userId: number): Promise<{ message: string; new_password: string }> => {
+    const response = await apiClient.post<{ message: string; new_password: string }>(`/admin/users/${userId}/reset-password`);
+    return response.data;
+  },
 };

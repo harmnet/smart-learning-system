@@ -17,7 +17,7 @@ const slides: BannerSlide[] = [
     id: 1,
     title: "2024秋季招生火热进行中",
     subtitle: "多个热门专业等你来选，名额有限，先到先得",
-    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=400&fit=crop",
+    image: "/images/zhaosheng.png",
     link: "/majors",
     buttonText: "立即报名"
   },

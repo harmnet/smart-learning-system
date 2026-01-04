@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import AdminLayout from '@/components/admin/AdminLayout';
 import Modal from '@/components/common/Modal';
 import { llmConfigService, LLMConfig, LLMConfigCreate, LLMConfigUpdate } from '@/services/llmConfig.service';
 
@@ -150,7 +149,7 @@ export default function LLMConfigsPage() {
   };
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6">
         {/* Header */}
         <div className="mb-6">
@@ -270,7 +269,7 @@ export default function LLMConfigsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.admin.llmConfigs.providerName} *
+              {t.admin.llmConfigs.providerName} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -283,7 +282,7 @@ export default function LLMConfigsPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.admin.llmConfigs.providerKey} *
+              {t.admin.llmConfigs.providerKey} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -297,7 +296,7 @@ export default function LLMConfigsPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.admin.llmConfigs.apiKey} *
+              {t.admin.llmConfigs.apiKey} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -439,7 +438,7 @@ export default function LLMConfigsPage() {
           )}
         </div>
       </Modal>
-    </AdminLayout>
+    </>
   );
 }
 

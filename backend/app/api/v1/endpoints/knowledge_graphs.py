@@ -14,6 +14,7 @@ from app.db.session import get_db
 from app.models.base import User
 from app.models.knowledge_graph import KnowledgeGraph, KnowledgeNode
 from app.models.llm_config import LLMConfig
+from app.models.teaching_resource import TeachingResource
 from app.utils.pdf_extractor import pdf_extractor
 
 logger = logging.getLogger(__name__)
@@ -40,8 +41,11 @@ class NodeUpdate(BaseModel):
     parent_id: Optional[int] = None
     sort_order: Optional[int] = None
 
-def build_tree(nodes: List[KnowledgeNode]) -> List[Dict]:
-    """构建树状结构"""
+def build_tree(nodes: List[KnowledgeNode], resource_counts: Dict[str, int] = None) -> List[Dict]:
+    """构建树状结构，包含资源数量统计"""
+    if resource_counts is None:
+        resource_counts = {}
+    
     # 创建节点字典
     node_dict = {node.id: {
         "id": node.id,
@@ -49,6 +53,7 @@ def build_tree(nodes: List[KnowledgeNode]) -> List[Dict]:
         "node_content": node.node_content,
         "parent_id": node.parent_id,
         "sort_order": node.sort_order,
+        "resource_count": resource_counts.get(node.node_name, 0),
         "children": []
     } for node in nodes}
     
@@ -62,6 +67,14 @@ def build_tree(nodes: List[KnowledgeNode]) -> List[Dict]:
             if node.parent_id in node_dict:
                 node_dict[node.parent_id]["children"].append(node_data)
     
+    # 递归计算每个节点及其子节点的资源总数
+    def calculate_total_resources(node):
+        total = node["resource_count"]
+        for child in node["children"]:
+            total += calculate_total_resources(child)
+        node["total_resource_count"] = total
+        return total
+    
     # 排序
     def sort_nodes(nodes_list):
         nodes_list.sort(key=lambda x: x["sort_order"])
@@ -70,6 +83,11 @@ def build_tree(nodes: List[KnowledgeNode]) -> List[Dict]:
                 sort_nodes(node["children"])
     
     sort_nodes(root_nodes)
+    
+    # 计算资源总数
+    for node in root_nodes:
+        calculate_total_resources(node)
+    
     return root_nodes
 
 @router.get("/")
@@ -230,8 +248,25 @@ async def get_graph_tree(
     )
     nodes = nodes_result.scalars().all()
     
+    # 查询每个知识点的资源数量
+    resource_counts = {}
+    resources_result = await db.execute(
+        select(
+            TeachingResource.knowledge_point,
+            func.count(TeachingResource.id).label('count')
+        ).where(
+            and_(
+                TeachingResource.teacher_id == teacher_id,
+                TeachingResource.is_active == True,
+                TeachingResource.knowledge_point.isnot(None)
+            )
+        ).group_by(TeachingResource.knowledge_point)
+    )
+    for row in resources_result:
+        resource_counts[row.knowledge_point] = row.count
+    
     # 构建树状结构
-    tree = build_tree(nodes)
+    tree = build_tree(nodes, resource_counts)
     
     return {
         "graph_id": graph.id,
@@ -782,4 +817,116 @@ async def _call_wenxin(config: LLMConfig, prompt: str) -> str:
             return result["result"]
         else:
             raise Exception("响应格式错误")
+
+@router.get("/{graph_id}/nodes/{node_id}/resources-recursive")
+async def get_node_resources_recursive(
+    graph_id: int,
+    node_id: int,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """递归获取知识图谱节点及其所有子节点的关联资源"""
+    # 验证图谱归属
+    graph_result = await db.execute(
+        select(KnowledgeGraph).where(
+            and_(
+                KnowledgeGraph.id == graph_id,
+                KnowledgeGraph.teacher_id == teacher_id,
+                KnowledgeGraph.is_active == True
+            )
+        )
+    )
+    graph = graph_result.scalars().first()
+    if not graph:
+        raise HTTPException(status_code=404, detail="知识图谱不存在")
+    
+    # 验证节点存在
+    node_result = await db.execute(
+        select(KnowledgeNode).where(
+            and_(
+                KnowledgeNode.id == node_id,
+                KnowledgeNode.graph_id == graph_id,
+                KnowledgeNode.is_active == True
+            )
+        )
+    )
+    node = node_result.scalars().first()
+    if not node:
+        raise HTTPException(status_code=404, detail="节点不存在")
+    
+    # 递归获取所有子节点ID（包括自己）
+    async def get_all_subnode_ids(parent_node_id: int) -> List[int]:
+        ids = [parent_node_id]
+        result = await db.execute(
+            select(KnowledgeNode.id).where(
+                and_(
+                    KnowledgeNode.parent_id == parent_node_id,
+                    KnowledgeNode.is_active == True
+                )
+            )
+        )
+        child_ids = result.scalars().all()
+        for child_id in child_ids:
+            ids.extend(await get_all_subnode_ids(child_id))
+        return ids
+    
+    node_ids = await get_all_subnode_ids(node_id)
+    
+    # 获取所有节点的名称，用于知识点搜索
+    nodes_result = await db.execute(
+        select(KnowledgeNode).where(KnowledgeNode.id.in_(node_ids))
+    )
+    nodes = nodes_result.scalars().all()
+    knowledge_points = [n.node_name for n in nodes]
+    
+    # 查询包含这些知识点的资源
+    from app.models.teaching_resource import TeachingResource
+    query = select(TeachingResource, User).join(
+        User, TeachingResource.teacher_id == User.id
+    ).where(
+        and_(
+            TeachingResource.teacher_id == teacher_id,
+            TeachingResource.is_active == True
+        )
+    )
+    
+    # 使用knowledge_point字段进行过滤
+    # 由于knowledge_point可能包含多个知识点（逗号分隔），我们需要进行模糊匹配
+    if knowledge_points:
+        from sqlalchemy import or_
+        conditions = [TeachingResource.knowledge_point.ilike(f"%{kp}%") for kp in knowledge_points]
+        query = query.where(or_(*conditions))
+    
+    query = query.order_by(TeachingResource.created_at.desc())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    resources = []
+    for resource, teacher in rows:
+        resources.append({
+            "id": resource.id,
+            "teacher_id": resource.teacher_id,
+            "teacher_name": teacher.full_name,
+            "resource_name": resource.resource_name,
+            "original_filename": resource.original_filename,
+            "file_size": resource.file_size,
+            "resource_type": resource.resource_type,
+            "knowledge_point": resource.knowledge_point,
+            "folder_id": resource.folder_id,
+            "is_active": resource.is_active,
+            "created_at": resource.created_at.isoformat() if resource.created_at else None,
+            "updated_at": resource.updated_at.isoformat() if resource.updated_at else None
+        })
+    
+    return {
+        "node": {
+            "id": node.id,
+            "node_name": node.node_name,
+            "node_content": node.node_content
+        },
+        "resources": resources,
+        "node_ids": node_ids,
+        "knowledge_points": knowledge_points
+    }
 

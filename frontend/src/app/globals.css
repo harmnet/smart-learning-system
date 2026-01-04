@@ -124,4 +124,34 @@
   .animate-fade-in-delay-2 {
     animation: fade-in 0.8s ease-out 0.4s both;
   }
+
+  /* 强制隐藏所有 select 元素的原生下拉箭头 */
+  select,
+  select:focus,
+  select:active,
+  select:hover {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
+  }
+  
+  /* 隐藏 IE/Edge 的下拉箭头 */
+  select::-ms-expand {
+    display: none !important;
+  }
+  
+  /* 隐藏 Firefox 的下拉箭头 */
+  select:-moz-focusring {
+    color: transparent !important;
+    text-shadow: 0 0 0 #000 !important;
+  }
+  
+  /* WebKit 浏览器（Chrome, Safari）特殊处理 */
+  select::-webkit-inner-spin-button,
+  select::-webkit-outer-spin-button,
+  select::-webkit-calendar-picker-indicator {
+    display: none !important;
+    -webkit-appearance: none !important;
+  }
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { knowledgeGraphService, KnowledgeGraph, KnowledgeNode, GraphTree } from '@/services/knowledgeGraph.service';
 import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
 import Modal from '@/components/common/Modal';
+import Toast from '@/components/common/Toast';
 
 export default function KnowledgeGraphPage() {
   const { t } = useLanguage();
@@ -38,6 +39,15 @@ export default function KnowledgeGraphPage() {
   const [aiGraphDescription, setAiGraphDescription] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiGenerateError, setAiGenerateError] = useState<string | null>(null);
+  
+  // Toast状态
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  
+  // G6图表相关
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+  const g6GraphRef = useRef<any>(null);
+  const allGraphDataRef = useRef<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
+  const [expandedGraphNodes, setExpandedGraphNodes] = useState<Set<string>>(new Set());
   
   // 从localStorage获取当前登录用户的ID
   useEffect(() => {
@@ -110,7 +120,7 @@ export default function KnowledgeGraphPage() {
       console.error('❌ [知识图谱] Error status:', error.response?.status);
       console.error('❌ [知识图谱] Error config:', error.config);
       const errorMessage = error.response?.data?.detail || error.message || '加载知识图谱失败';
-      alert(`错误: ${errorMessage}\n\n请检查：\n1. 后端服务是否运行在 http://localhost:8000\n2. 网络连接是否正常\n3. 浏览器控制台是否有更多错误信息`);
+      setToast({ message: `错误: ${errorMessage}`, type: 'error' });
     } finally {
       setLoading(false);
       console.log('🏁 [知识图谱] loadGraphs完成');
@@ -143,17 +153,253 @@ export default function KnowledgeGraphPage() {
     setEditingNode(null);
   };
 
+  // 渲染G6图表
+  const renderG6Graph = async (data: { nodes: any[]; edges: any[] }) => {
+    if (!graphContainerRef.current) {
+      console.warn('⚠️ G6 Container not ready');
+      return;
+    }
+
+    try {
+      // 动态导入 G6（避免 SSR 问题）
+      const { Graph } = await import('@antv/g6');
+
+      console.log('✅ G6 loaded for knowledge graph, creating graph...');
+
+      // 销毁旧图表
+      if (g6GraphRef.current) {
+        g6GraphRef.current.destroy();
+      }
+      // 清空容器
+      if (graphContainerRef.current) {
+        graphContainerRef.current.innerHTML = '';
+      }
+
+      // 创建新图表
+      const graph = new Graph({
+        container: graphContainerRef.current,
+        width: graphContainerRef.current.offsetWidth,
+        height: graphContainerRef.current.offsetHeight,
+        data,
+        layout: {
+          type: 'radial',
+          unitRadius: 180,        // 增加半径，避免节点过于密集
+          linkDistance: 150,      // 增加连线距离
+          preventOverlap: true,
+          nodeSize: 50,           // 增加防重叠计算的节点尺寸
+          strictRadial: false,
+          nodeSpacing: 30,        // 节点之间的最小间距
+        },
+        node: {
+          style: {
+            size: (d: any) => d.style?.size || 30,
+            fill: (d: any) => d.style?.fill || '#3b82f6',
+            stroke: (d: any) => d.style?.stroke || '#2563eb',
+            lineWidth: (d: any) => d.style?.lineWidth || 2,
+            labelText: (d: any) => d.label || d.id,
+            labelFill: '#1e293b',
+            labelFontSize: (d: any) => d.style?.fontSize || 12,
+            labelFontWeight: (d: any) => d.style?.fontWeight || 'bold',
+            labelPosition: 'bottom',
+            labelOffsetY: 10,           // 增加标签偏移，避免和节点重叠
+            labelBackgroundFill: '#ffffff',
+            labelBackgroundOpacity: 0.95,  // 添加背景透明度
+            labelBackgroundRadius: 4,
+            labelPadding: [3, 8, 3, 8], // 增加内边距
+            labelMaxWidth: 120,         // 限制标签最大宽度
+            cursor: 'pointer',
+          },
+          animation: {
+            enter: [
+              {
+                fields: ['opacity'],
+                duration: 500,
+                easing: 'ease-out',
+              },
+            ],
+          },
+        },
+        edge: {
+          style: {
+            stroke: '#94a3b8',         // 稍微深一点的颜色，更容易看清
+            lineWidth: 2,
+            lineAppendWidth: 10,       // 增加交互区域
+            opacity: 0.6,              // 添加透明度，避免线条太突出
+          },
+          animation: {
+            enter: [
+              {
+                fields: ['opacity'],
+                duration: 500,
+                easing: 'ease-out',
+              },
+            ],
+          },
+        },
+        zoom: 1,
+        // 启用交互：拖拽画布、缩放、拖拽节点
+        plugins: [],
+      });
+
+      // 渲染图表
+      await graph.render();
+      graph.fitCenter();
+      graph.zoomTo(0.8); // 初始缩放到80%，给节点更多空间
+
+      // 监听节点点击事件
+      graph.on('node:click', (event: any) => {
+        let nodeId = null;
+        if (event.target && event.target.id) {
+          nodeId = event.target.id;
+        } else if (event.target && event.target.cfg && event.target.cfg.id) {
+          nodeId = event.target.cfg.id;
+        } else if (event.item && event.item.getID) {
+          nodeId = event.item.getID();
+        } else if (event.itemId) {
+          nodeId = event.itemId;
+        }
+
+        console.log('📍 Node clicked:', nodeId);
+        if (nodeId) {
+          handleGraphNodeClick(nodeId);
+        }
+      });
+
+      g6GraphRef.current = graph;
+      console.log('✅ G6 graph created successfully');
+    } catch (error) {
+      console.error('❌ Failed to render G6 graph:', error);
+    }
+  };
+
+  // 处理G6图表节点点击
+  const handleGraphNodeClick = async (nodeId: string) => {
+    console.log('🔵 Handling node click:', nodeId);
+    
+    const node = allGraphDataRef.current.nodes.find(n => n.id === nodeId);
+    if (!node) {
+      console.warn('⚠️ Node not found:', nodeId);
+      return;
+    }
+
+    // 切换节点展开状态
+    const newExpandedNodes = new Set(expandedGraphNodes);
+    if (newExpandedNodes.has(nodeId)) {
+      newExpandedNodes.delete(nodeId);
+    } else {
+      newExpandedNodes.add(nodeId);
+    }
+    setExpandedGraphNodes(newExpandedNodes);
+
+    // 获取当前应该显示的节点和边
+    const visibleNodes: any[] = [];
+    const visibleEdges: any[] = [];
+
+    // 递归添加节点和边
+    const addNodeAndChildren = (currentNodeId: string) => {
+      const currentNode = allGraphDataRef.current.nodes.find(n => n.id === currentNodeId);
+      if (!currentNode || visibleNodes.find(n => n.id === currentNodeId)) return;
+
+      visibleNodes.push(currentNode);
+
+      // 如果节点已展开，添加其子节点
+      if (newExpandedNodes.has(currentNodeId)) {
+        const childEdges = allGraphDataRef.current.edges.filter(e => e.source === currentNodeId);
+        childEdges.forEach(edge => {
+          visibleEdges.push(edge);
+          addNodeAndChildren(edge.target);
+        });
+      }
+    };
+
+    // 从根节点开始添加
+    const rootNodes = allGraphDataRef.current.nodes.filter(n => n.data.level === 0);
+    rootNodes.forEach(root => addNodeAndChildren(root.id));
+
+    // 重新渲染图表
+    await renderG6Graph({ nodes: visibleNodes, edges: visibleEdges });
+  };
+
+  // 准备G6数据
+  const prepareG6Data = () => {
+    if (!graphTree || !graphTree.tree) return { nodes: [], edges: [] };
+
+    const nodes: any[] = [];
+    const edges: any[] = [];
+
+    const addNode = (node: KnowledgeNode, level: number = 0, parentId?: string) => {
+      const nodeId = `node-${node.id}`;
+      
+      // 根据层级设置不同的颜色和大小
+      const levelStyles = [
+        { size: 40, fill: '#10b981', stroke: '#059669', fontSize: 16 }, // Level 0: 绿色，根节点最大
+        { size: 32, fill: '#3b82f6', stroke: '#2563eb', fontSize: 14 }, // Level 1: 蓝色
+        { size: 26, fill: '#a855f7', stroke: '#9333ea', fontSize: 12 }, // Level 2: 紫色
+        { size: 22, fill: '#f59e0b', stroke: '#d97706', fontSize: 11 }, // Level 3+: 橙色
+      ];
+      const style = levelStyles[Math.min(level, 3)];
+
+      nodes.push({
+        id: nodeId,
+        label: node.node_name,
+        style: {
+          ...style,
+          fontWeight: level === 0 ? 600 : 500,
+        },
+        data: {
+          level,
+          nodeData: node,
+        },
+      });
+
+      if (parentId) {
+        edges.push({
+          source: parentId,
+          target: nodeId,
+        });
+      }
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => addNode(child, level + 1, nodeId));
+      }
+    };
+
+    graphTree.tree.forEach(root => addNode(root, 0));
+
+    return { nodes, edges };
+  };
+
+  // 当viewMode切换到graph时，初始化G6图表
+  useEffect(() => {
+    if (viewMode === 'graph' && graphTree && graphContainerRef.current) {
+      const data = prepareG6Data();
+      allGraphDataRef.current = data;
+      
+      // 初始只显示根节点
+      const rootNodes = data.nodes.filter(n => n.data.level === 0);
+      renderG6Graph({ nodes: rootNodes, edges: [] });
+    }
+    
+    // 清理函数
+    return () => {
+      if (viewMode !== 'graph' && g6GraphRef.current) {
+        g6GraphRef.current.destroy();
+        g6GraphRef.current = null;
+      }
+    };
+  }, [viewMode, graphTree]);
+
   const handleAIGenerateGraph = async () => {
     if (!aiGraphName.trim()) {
-      alert('请输入知识图谱名称');
+      setToast({ message: '请输入知识图谱名称', type: 'warning' });
       return;
     }
     if (!pdfFile) {
-      alert('请上传PDF文档');
+      setToast({ message: '请上传PDF文档', type: 'warning' });
       return;
     }
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
 
@@ -169,7 +415,7 @@ export default function KnowledgeGraphPage() {
       );
 
       if (result.success) {
-        alert('AI知识图谱生成成功！');
+        setToast({ message: 'AI知识图谱生成成功！', type: 'success' });
         setAiGenerateModalOpen(false);
         setPdfFile(null);
         setAiGraphName('');
@@ -198,11 +444,11 @@ export default function KnowledgeGraphPage() {
 
   const handleCreateGraph = async () => {
     if (!graphName.trim()) {
-      alert(t.teacher.knowledgeGraph.placeholders.graphName);
+      setToast({ message: t.teacher.knowledgeGraph.placeholders.graphName, type: 'warning' });
       return;
     }
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
 
@@ -211,23 +457,23 @@ export default function KnowledgeGraphPage() {
         graph_name: graphName,
         description: graphDescription || undefined,
       });
-      alert(t.teacher.knowledgeGraph.createSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.createSuccess, type: 'success' });
       setCreateGraphModalOpen(false);
       resetGraphForm();
       await loadGraphs();
     } catch (error: any) {
       console.error('Failed to create graph:', error);
-      alert(t.teacher.knowledgeGraph.createError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.createError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
   const handleUpdateGraph = async () => {
     if (!editingGraph || !graphName.trim()) {
-      alert(t.teacher.knowledgeGraph.placeholders.graphName);
+      setToast({ message: t.teacher.knowledgeGraph.placeholders.graphName, type: 'warning' });
       return;
     }
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
 
@@ -236,7 +482,7 @@ export default function KnowledgeGraphPage() {
         graph_name: graphName,
         description: graphDescription || undefined,
       });
-      alert(t.teacher.knowledgeGraph.updateSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.updateSuccess, type: 'success' });
       setEditGraphModalOpen(false);
       resetGraphForm();
       await loadGraphs();
@@ -245,20 +491,20 @@ export default function KnowledgeGraphPage() {
       }
     } catch (error: any) {
       console.error('Failed to update graph:', error);
-      alert(t.teacher.knowledgeGraph.updateError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.updateError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
   const handleDeleteGraph = async (graph: KnowledgeGraph) => {
     if (!confirm(t.teacher.knowledgeGraph.deleteConfirm)) return;
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
     
     try {
       await knowledgeGraphService.delete(graph.id, teacherId);
-      alert(t.teacher.knowledgeGraph.deleteSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.deleteSuccess, type: 'success' });
       if (selectedGraph?.id === graph.id) {
         setSelectedGraph(null);
         setGraphTree(null);
@@ -266,7 +512,7 @@ export default function KnowledgeGraphPage() {
       await loadGraphs();
     } catch (error: any) {
       console.error('Failed to delete graph:', error);
-      alert(t.teacher.knowledgeGraph.deleteError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.deleteError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
@@ -285,11 +531,11 @@ export default function KnowledgeGraphPage() {
 
   const handleCreateNode = async () => {
     if (!selectedGraph || !nodeName.trim()) {
-      alert(t.teacher.knowledgeGraph.placeholders.nodeName);
+      setToast({ message: t.teacher.knowledgeGraph.placeholders.nodeName, type: 'warning' });
       return;
     }
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
 
@@ -299,7 +545,7 @@ export default function KnowledgeGraphPage() {
         node_content: nodeContent || undefined,
         parent_id: parentNodeId || undefined,
       });
-      alert(t.teacher.knowledgeGraph.nodeCreateSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.nodeCreateSuccess, type: 'success' });
       setCreateNodeModalOpen(false);
       resetNodeForm();
       await loadGraphTree(selectedGraph.id);
@@ -307,17 +553,17 @@ export default function KnowledgeGraphPage() {
       await loadGraphs();
     } catch (error: any) {
       console.error('Failed to create node:', error);
-      alert(t.teacher.knowledgeGraph.nodeCreateError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.nodeCreateError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
   const handleUpdateNode = async () => {
     if (!selectedGraph || !editingNode || !nodeName.trim()) {
-      alert(t.teacher.knowledgeGraph.placeholders.nodeName);
+      setToast({ message: t.teacher.knowledgeGraph.placeholders.nodeName, type: 'warning' });
       return;
     }
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
 
@@ -327,7 +573,7 @@ export default function KnowledgeGraphPage() {
         node_content: nodeContent || undefined,
         parent_id: parentNodeId || undefined,
       });
-      alert(t.teacher.knowledgeGraph.nodeUpdateSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.nodeUpdateSuccess, type: 'success' });
       setEditNodeModalOpen(false);
       resetNodeForm();
       await loadGraphTree(selectedGraph.id);
@@ -335,26 +581,26 @@ export default function KnowledgeGraphPage() {
       await loadGraphs();
     } catch (error: any) {
       console.error('Failed to update node:', error);
-      alert(t.teacher.knowledgeGraph.nodeUpdateError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.nodeUpdateError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
   const handleDeleteNode = async (node: KnowledgeNode) => {
     if (!selectedGraph || !confirm(t.teacher.knowledgeGraph.deleteNodeConfirm)) return;
     if (teacherId === undefined) {
-      alert('无法获取教师ID，请重新登录');
+      setToast({ message: '无法获取教师ID，请重新登录', type: 'error' });
       return;
     }
     
     try {
       await knowledgeGraphService.deleteNode(node.id, teacherId);
-      alert(t.teacher.knowledgeGraph.nodeDeleteSuccess);
+      setToast({ message: t.teacher.knowledgeGraph.nodeDeleteSuccess, type: 'success' });
       await loadGraphTree(selectedGraph.id);
       // 刷新图谱列表以更新节点数
       await loadGraphs();
     } catch (error: any) {
       console.error('Failed to delete node:', error);
-      alert(t.teacher.knowledgeGraph.nodeDeleteError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: t.teacher.knowledgeGraph.nodeDeleteError + ': ' + (error.response?.data?.detail || error.message), type: 'error' });
     }
   };
 
@@ -367,27 +613,19 @@ export default function KnowledgeGraphPage() {
   };
 
   // 递归获取所有节点选项（用于父节点选择）
-  const getAllNodesForSelect = (nodes: KnowledgeNode[], excludeId?: number, level: number = 0, isLast: boolean[] = []): Array<{id: number, name: string, level: number}> => {
+  const getAllNodesForSelect = (nodes: KnowledgeNode[], excludeId?: number, level: number = 0): Array<{id: number, name: string, level: number}> => {
     const result: Array<{id: number, name: string, level: number}> = [];
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
-      const isNodeLast = i === nodes.length - 1;
       
       if (node.id !== excludeId) {
-        // 构建层级前缀：使用树状结构符号
-        let prefix = '';
-        if (level > 0) {
-          // 为每个父级添加连接线
-          for (let j = 0; j < level - 1; j++) {
-            prefix += isLast[j] ? '   ' : '│  ';
-          }
-          // 当前节点的连接线
-          prefix += isNodeLast ? '└─ ' : '├─ ';
-        }
-        result.push({ id: node.id, name: prefix + node.node_name, level });
+        // 使用全角空格实现层级缩进效果（参考组织管理）
+        const indent = level > 0 ? '　'.repeat(level) + '├─ ' : '';
+        const displayName = indent + node.node_name;
+        result.push({ id: node.id, name: displayName, level });
         
         if (node.children && node.children.length > 0) {
-          result.push(...getAllNodesForSelect(node.children, excludeId, level + 1, [...isLast, isNodeLast]));
+          result.push(...getAllNodesForSelect(node.children, excludeId, level + 1));
         }
       }
     }
@@ -408,8 +646,8 @@ export default function KnowledgeGraphPage() {
           {/* 绘制连接线 */}
           {level > 0 && (
             <div className="absolute left-0 top-0 bottom-0 flex items-start" style={{ left: `${indent - 16}px`, width: '16px' }}>
-              {/* 垂直连接线 */}
-              {parentPath.map((isParentLast, idx) => (
+              {/* 垂直连接线：显示所有父级路径的连接线 */}
+              {parentPath.map((shouldHide, idx) => (
                 <div
                   key={idx}
                   className="absolute top-0 bottom-0"
@@ -417,10 +655,21 @@ export default function KnowledgeGraphPage() {
                     left: `${idx * 24}px`,
                     width: '1px',
                     backgroundColor: '#cbd5e1',
-                    display: isParentLast ? 'none' : 'block'
+                    display: shouldHide ? 'none' : 'block'
                   }}
                 />
               ))}
+              {/* 当前节点的垂直连接线 */}
+              <div
+                className="absolute"
+                style={{
+                  left: `${(level - 1) * 24}px`,
+                  top: 0,
+                  bottom: isLast ? '50%' : 0,  // 最后一个节点的线只到中间，其他节点延伸到底部
+                  width: '1px',
+                  backgroundColor: '#cbd5e1',
+                }}
+              />
               {/* 水平连接线 */}
               <div
                 className="absolute top-1/2"
@@ -429,16 +678,6 @@ export default function KnowledgeGraphPage() {
                   width: '16px',
                   height: '1px',
                   backgroundColor: '#cbd5e1',
-                  transform: 'translateY(-50%)'
-                }}
-              />
-              {/* 节点连接点 */}
-              <div
-                className="absolute top-1/2 rounded-full bg-slate-400"
-                style={{
-                  left: `${(level - 1) * 24 + 15}px`,
-                  width: '6px',
-                  height: '6px',
                   transform: 'translateY(-50%)'
                 }}
               />
@@ -451,6 +690,20 @@ export default function KnowledgeGraphPage() {
           )}
           {selectedGraph && (
             <div className="flex gap-1 ml-auto">
+              <button
+                onClick={() => {
+                  resetNodeForm();
+                  setParentNodeId(node.id);
+                  setCreateNodeModalOpen(true);
+                }}
+                className="px-2 py-1 text-xs text-green-600 hover:bg-green-50 rounded flex items-center gap-1"
+                title={t.teacher.knowledgeGraph.addChildNode || '添加子节点'}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                {t.teacher.knowledgeGraph.addChildNode || '添加子节点'}
+              </button>
               <button
                 onClick={() => handleEditNode(node)}
                 className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
@@ -532,41 +785,17 @@ export default function KnowledgeGraphPage() {
         </div>
       );
     } else {
-      // 图谱展示 - 使用改进的网格布局，显示完整的层级关系
-      const renderGraphNode = (node: KnowledgeNode, level: number = 0): JSX.Element => {
-        const colors = [
-          'from-purple-50 to-blue-50 border-purple-200',
-          'from-green-50 to-emerald-50 border-green-200',
-          'from-orange-50 to-amber-50 border-orange-200',
-          'from-pink-50 to-rose-50 border-pink-200',
-        ];
-        const colorClass = colors[level % colors.length];
-        
-        return (
-          <div key={node.id} className={`bg-gradient-to-br ${colorClass} border-2 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow`}>
-            <div className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-              {level > 0 && <span className="text-xs text-slate-500">└─</span>}
-              {node.node_name}
-            </div>
-            {node.node_content && (
-              <div className="text-sm text-slate-600 mb-3">{node.node_content}</div>
-            )}
-            {node.children && node.children.length > 0 && (
-              <div className="mt-3 space-y-2">
-                <div className="text-xs font-medium text-slate-700 mb-2">子节点 ({node.children.length}):</div>
-                <div className="space-y-2">
-                  {node.children.map(child => renderGraphNode(child, level + 1))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      };
-      
+      // 图谱展示 - 使用G6可视化
       return (
-        <div className="p-6 overflow-auto">
-          <div className="space-y-4">
-            {graphTree.tree.map(node => renderGraphNode(node, 0))}
+        <div className="relative w-full h-[700px] bg-white border border-slate-200 rounded-lg">
+          <div ref={graphContainerRef} className="w-full h-full" />
+          {(!graphTree || !graphTree.tree || graphTree.tree.length === 0) && (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+              {t.teacher.knowledgeGraph.noNodes}
+            </div>
+          )}
+          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-sm text-xs text-slate-600">
+            💡 点击节点展开/收起子节点，鼠标滚轮缩放，拖动画布移动
           </div>
         </div>
       );
@@ -765,7 +994,7 @@ export default function KnowledgeGraphPage() {
                     // 检查文件大小（1MB = 1024 * 1024 bytes）
                     const maxSize = 1024 * 1024;
                     if (file.size > maxSize) {
-                      alert(`文件大小超过限制（${(file.size / 1024 / 1024).toFixed(2)}MB），最大允许1MB`);
+                      setToast({ message: `文件大小超过限制（${(file.size / 1024 / 1024).toFixed(2)}MB），最大允许1MB`, type: 'warning' });
                       e.target.value = '';
                       setPdfFile(null);
                       return;
@@ -908,16 +1137,6 @@ export default function KnowledgeGraphPage() {
               {t.teacher.knowledgeGraph.viewMode.tree}
             </button>
             <button
-              onClick={() => setViewMode('mindmap')}
-              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                viewMode === 'mindmap'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-slate-600 hover:text-blue-600'
-              }`}
-            >
-              {t.teacher.knowledgeGraph.viewMode.mindmap}
-            </button>
-            <button
               onClick={() => setViewMode('graph')}
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                 viewMode === 'graph'
@@ -981,11 +1200,11 @@ export default function KnowledgeGraphPage() {
             <select
               value={parentNodeId || ''}
               onChange={(e) => setParentNodeId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm hover:border-slate-300 cursor-pointer"
             >
-              <option value="">{t.teacher.knowledgeGraph.rootNode}</option>
+              <option value="" className="py-2">{t.teacher.knowledgeGraph.rootNode}</option>
               {graphTree && graphTree.tree && getAllNodesForSelect(graphTree.tree).map(node => (
-                <option key={node.id} value={node.id} style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
+                <option key={node.id} value={node.id} className="py-2">
                   {node.name}
                 </option>
               ))}
@@ -1042,11 +1261,11 @@ export default function KnowledgeGraphPage() {
             <select
               value={parentNodeId || ''}
               onChange={(e) => setParentNodeId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+              className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-2xl text-sm text-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-sm hover:border-slate-300 cursor-pointer"
             >
-              <option value="">{t.teacher.knowledgeGraph.rootNode}</option>
+              <option value="" className="py-2">{t.teacher.knowledgeGraph.rootNode}</option>
               {graphTree && graphTree.tree && getAllNodesForSelect(graphTree.tree, editingNode?.id).map(node => (
-                <option key={node.id} value={node.id} style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
+                <option key={node.id} value={node.id} className="py-2">
                   {node.name}
                 </option>
               ))}
@@ -1071,6 +1290,15 @@ export default function KnowledgeGraphPage() {
           </div>
         </div>
       </Modal>
+      
+      {/* Toast提示 */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </TeacherLayout>
   );
 }

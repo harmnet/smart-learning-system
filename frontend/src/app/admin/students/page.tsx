@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { adminService, Student as StudentType, StudentStats, StudentCreate, Class } from '@/services/admin.service';
 import { majorService, Major } from '@/services/major.service';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -73,6 +74,8 @@ export default function AdminStudentsPage() {
       const currentPage = page || pagination.current;
       const skip = (currentPage - 1) * pagination.pageSize;
       
+      console.log('📡 Loading student data with params:', { searchParams, skip, limit: pagination.pageSize });
+      
       const [studentsData, statsData] = await Promise.all([
         adminService.getStudents({
           ...searchParams,
@@ -82,8 +85,11 @@ export default function AdminStudentsPage() {
         adminService.getStudentStats()
       ]);
       
+      console.log('📦 Received student data:', studentsData);
+      
       // Ensure studentsData has the correct structure
       if (studentsData && Array.isArray(studentsData.items)) {
+        console.log('✅ Setting students:', studentsData.items);
         setStudents(studentsData.items);
         setPagination({
           ...pagination,
@@ -91,7 +97,7 @@ export default function AdminStudentsPage() {
           total: studentsData.total || 0
         });
       } else {
-        console.error('Invalid students data format:', studentsData);
+        console.error('❌ Invalid students data format:', studentsData);
         setStudents([]);
         setPagination({
           ...pagination,
@@ -241,12 +247,16 @@ export default function AdminStudentsPage() {
     if (!editingStudent) return;
     
     try {
-      await adminService.updateStudent(editingStudent.id, editForm);
+      console.log('🔄 Updating student:', editingStudent.id, 'with data:', editForm);
+      const result = await adminService.updateStudent(editingStudent.id, editForm);
+      console.log('✅ Update result:', result);
       setEditModalOpen(false);
       setEditingStudent(null);
-      loadData();
+      console.log('🔄 Reloading student data...');
+      await loadData();
+      console.log('✅ Student data reloaded');
     } catch (err: any) {
-      console.error('Failed to update student:', err);
+      console.error('❌ Failed to update student:', err);
       alert(t.common.error + ': ' + (err.response?.data?.detail || err.message));
     }
   };
@@ -272,6 +282,7 @@ export default function AdminStudentsPage() {
     <div className="h-full flex flex-col">
       {/* Page Header */}
       <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             {t.admin.students.title}
@@ -279,6 +290,17 @@ export default function AdminStudentsPage() {
           <p className="text-sm text-slate-500 mt-1 font-medium">
             {t.admin.students.subtitle}
           </p>
+          </div>
+          <Link 
+            href="/admin/students/heatmap" 
+            target="_blank"
+            className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-full font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-purple-500/30 active:scale-95"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            热力图
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -369,6 +391,7 @@ export default function AdminStudentsPage() {
               <tr>
                 <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.studentNo}</th>
                 <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.name}</th>
+                <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.username}</th>
                 <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.email}</th>
                 <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.phone}</th>
                 <th className="px-8 py-5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">{t.admin.students.columns.class}</th>
@@ -380,7 +403,7 @@ export default function AdminStudentsPage() {
             <tbody className="divide-y divide-slate-50">
               {!loading && Array.isArray(students) && students.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-8 py-12 text-center">
+                  <td colSpan={9} className="px-8 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400">
                       <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -401,11 +424,11 @@ export default function AdminStudentsPage() {
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center text-sm font-bold text-emerald-600 shadow-sm">
                         {student.full_name ? student.full_name.charAt(0).toUpperCase() : student.username.charAt(0).toUpperCase()}
                       </div>
-                      <div>
                         <div className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">{student.full_name || student.username}</div>
-                        <div className="text-xs text-slate-400 font-mono">@{student.username}</div>
-                      </div>
                     </div>
+                  </td>
+                  <td className="px-8 py-4 whitespace-nowrap">
+                    <span className="text-sm text-slate-600 font-mono">{student.username}</span>
                   </td>
                   <td className="px-8 py-4 whitespace-nowrap text-sm text-slate-500">{student.email}</td>
                   <td className="px-8 py-4 whitespace-nowrap text-sm text-slate-500">{student.phone || '-'}</td>
@@ -419,7 +442,7 @@ export default function AdminStudentsPage() {
                     )}
                   </td>
                   <td className="px-8 py-4 whitespace-nowrap text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-2">
                       <Tooltip content={t.common.edit}>
                         <button onClick={() => handleEdit(student)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
@@ -442,7 +465,7 @@ export default function AdminStudentsPage() {
         {pagination.total > 0 && (
           <div className="px-8 py-6 border-t border-slate-100 flex items-center justify-between bg-white">
             <div className="text-sm text-slate-500">
-              显示 {((pagination.current - 1) * pagination.pageSize) + 1} - {Math.min(pagination.current * pagination.pageSize, pagination.total)} 条，共 {pagination.total} 条
+              {t.common.show} {((pagination.current - 1) * pagination.pageSize) + 1} - {Math.min(pagination.current * pagination.pageSize, pagination.total)} {t.common.records}, {t.common.total} {pagination.total} {t.common.records}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -450,7 +473,7 @@ export default function AdminStudentsPage() {
                 disabled={pagination.current === 1}
                 className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
-                上一页
+                {t.common.previous}
               </button>
               
               <div className="flex items-center gap-1">
@@ -520,7 +543,7 @@ export default function AdminStudentsPage() {
                 disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
                 className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
-                下一页
+                {t.common.next}
               </button>
             </div>
           </div>

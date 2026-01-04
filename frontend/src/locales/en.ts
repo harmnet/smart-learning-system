@@ -56,6 +56,7 @@ export const en: Translations = {
     organizations: 'Organizations',
     teachers: 'Teachers',
     students: 'Students',
+    users: 'Users',
     majors: 'Majors',
     classes: 'Classes',
     dictionary: 'Dictionary',
@@ -102,6 +103,7 @@ export const en: Translations = {
       addTitle: 'Add New Student',
       editTitle: 'Edit Student Profile',
       selectClass: 'Select Class',
+      heatmap: 'Heatmap',
       classFilter: {
         title: 'Filter Classes',
         major: 'Major',
@@ -118,6 +120,7 @@ export const en: Translations = {
         avgSize: 'Avg Class Size'
       },
       students: 'Students',
+      viewStudents: 'View Class Students',
       columns: {
         name: 'Class Name',
         code: 'Code',
@@ -131,6 +134,34 @@ export const en: Translations = {
       editTitle: 'Edit Class Info',
       deleteError: {
         hasStudents: 'Cannot delete class: There are active students in this class. Please delete or reassign the students first.'
+      },
+      overview: {
+        title: 'Class Overview',
+        subtitle: 'Visual representation of majors, grades, and classes relationships',
+        noData: 'No Class Data',
+        noDataHint: 'Please add classes in Class Management first',
+        major: 'Major',
+        grade: 'Grade',
+        class: 'Class',
+        classCode: 'Class Code',
+        tip: '💡 Tip: You can drag the canvas, zoom, drag nodes, and hover to view details'
+      },
+      heatmap: {
+        title: 'Class Distribution Heatmap',
+        subtitle: 'View class distribution by major and grade',
+        legend: 'Color Legend (by Student Count)',
+        students: 'students',
+        noClass: 'No Classes',
+        classDetails: 'Class Details',
+        className: 'Class Name',
+        major: 'Major',
+        grade: 'Grade',
+        studentCount: 'Student Count',
+        stats: {
+          majors: 'Total Majors',
+          classes: 'Total Classes',
+          students: 'Total Students'
+        }
       }
     },
     teachers: {
@@ -197,6 +228,53 @@ export const en: Translations = {
         }
       }
     },
+    users: {
+      title: 'User Management',
+      subtitle: 'Manage all system users',
+      columns: {
+        name: 'Name',
+        username: 'Username',
+        phone: 'Phone',
+        email: 'Email',
+        role: 'Role',
+        status: 'Status',
+        actions: 'Actions'
+      },
+      roles: {
+        admin: 'Administrator',
+        teacher: 'Teacher',
+        student: 'Student'
+      },
+      filters: {
+        name: 'Name',
+        username: 'Username',
+        phone: 'Phone',
+        search: 'Search',
+        reset: 'Reset'
+      },
+      actions: {
+        changePassword: 'Change Password',
+        resetPassword: 'Reset Password'
+      },
+      changePassword: {
+        title: 'Change Password',
+        currentPassword: 'Current Password',
+        newPassword: 'New Password',
+        confirmPassword: 'Confirm Password',
+        submit: 'Submit',
+        success: 'Password changed successfully',
+        error: 'Failed to change password'
+      },
+      resetPassword: {
+        title: 'Reset Password',
+        warning: 'Confirm Password Reset',
+        confirmMessage: 'This operation will reset the user\'s login password to "111111". Are you sure you want to continue?',
+        confirm: 'Confirm Reset',
+        success: 'Password reset successfully',
+        successMessage: 'Password has been reset to: 111111',
+        error: 'Failed to reset password'
+      }
+    },
     majors: {
       title: 'Major & Programs',
       subtitle: 'Manage academic programs, curriculum, and tuition',
@@ -212,7 +290,10 @@ export const en: Translations = {
         organization: 'Organization',
         tuition: 'Tuition',
         duration: 'Duration',
-        totalTuition: 'Total Cost'
+        totalTuition: 'Total Cost',
+        classesCount: 'Classes',
+        studentsCount: 'Students',
+        teacher: 'Program Director'
       },
       addTitle: 'Add New Major',
       editTitle: 'Edit Major Info',
@@ -417,6 +498,7 @@ export const en: Translations = {
       editGraph: 'Edit Graph',
       deleteGraph: 'Delete Graph',
       createNode: 'Create Node',
+      addChildNode: 'Add Child Node',
       editNode: 'Edit Node',
       deleteNode: 'Delete Node',
       nodeName: 'Node Name',
@@ -504,14 +586,17 @@ export const en: Translations = {
         resourcesCount: 'resources',
       },
       types: {
-        all: 'All Types',
-        video: 'Video',
+        all: 'All',
+        video: 'MP4',
         ppt: 'PPT',
         pdf: 'PDF',
         word: 'Word',
         excel: 'Excel',
-        markdown: 'Markdown',
+        markdown: 'MD',
         image: 'Image',
+        zip: 'Zip',
+        txt: 'TXT',
+        question: 'Question',
       },
       stats: {
         total: 'Total Resources',
@@ -553,6 +638,34 @@ export const en: Translations = {
         noFolders: 'No folders',
         backToParent: 'Back to Parent',
         currentPath: 'Current Path',
+        folderColumn: 'Folder',
+        noFolder: 'Root',
+      },
+      table: {
+        name: 'Resource Name',
+        type: 'Type',
+        size: 'Size',
+        knowledgePoint: 'Knowledge Point',
+        folder: 'Folder',
+        uploadTime: 'Upload Time',
+        actions: 'Actions',
+        noData: 'No resource data',
+        selectFolderOrNode: 'Please select a folder or knowledge point to view resources',
+      },
+      filter: {
+        type: 'Filter by Type',
+        all: 'All',
+      },
+      sort: {
+        time: 'Time',
+        name: 'Name',
+      },
+      pagination: {
+        total: 'Total',
+        items: 'items',
+        page: 'page',
+        perPage: 'Per page',
+        rows: 'rows',
       }
     },
     referenceMaterials: {

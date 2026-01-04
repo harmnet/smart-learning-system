@@ -172,9 +172,11 @@ async def get_students(
         elif student_no and not profile:
             continue
         
-        # Get class name and organization name
+        # Get class name, organization name, major name, and grade
         class_name = "-"
         organization_name = "-"
+        major_name = None
+        grade = None
         if profile and profile.class_id:
             # Join Class -> Major -> Organization to get organization name
             from app.models.base import Organization
@@ -188,6 +190,9 @@ async def get_students(
             if class_row:
                 class_obj, major_obj, org_obj = class_row
                 class_name = class_obj.name
+                grade = class_obj.grade  # Get grade from class
+                if major_obj:
+                    major_name = major_obj.name  # Get major name
                 if org_obj:
                     organization_name = org_obj.name
         
@@ -202,7 +207,9 @@ async def get_students(
             "student_no": profile.student_no if profile else None,
             "class_name": class_name,
             "class_id": profile.class_id if profile else None,
-            "organization_name": organization_name
+            "organization_name": organization_name,
+            "major_name": major_name,  # Add major_name
+            "grade": grade  # Add grade
         })
     
     return {
@@ -316,12 +323,17 @@ async def update_student(
     profile_result = await db.execute(select(StudentProfile).where(StudentProfile.user_id == student_id))
     profile = profile_result.scalars().first()
     
+    # Extract class_id and student_no from request body
+    class_id = request_body.get("class_id")
+    student_no = request_body.get("student_no")
+    
+    # If profile doesn't exist, create one if class_id or student_no is provided
+    if not profile and (class_id or student_no):
+        profile = StudentProfile(user_id=student_id)
+        db.add(profile)
+    
     if profile:
         profile_updated = False
-        
-        # Extract class_id and student_no from request body
-        class_id = request_body.get("class_id")
-        student_no = request_body.get("student_no")
         
         if class_id is not None and class_id != 0:
             # Validate class exists
@@ -1115,16 +1127,16 @@ async def get_classes(
         classes_list.append({
             "id": class_id,
             "name": cls[1],
-            "code": cls[2],
-            "major_id": cls[3],
+            "code": cls[5],
+            "major_id": cls[2],
             "grade": cls[4],
-            "major_name": cls[8] if len(cls) > 8 else None,
-            "organization_name": cls[9] if len(cls) > 9 else None,
-            "organization_id": cls[10] if len(cls) > 10 else None,
+            "major_name": cls[9] if len(cls) > 9 else None,
+            "organization_name": cls[10] if len(cls) > 10 else None,
+            "organization_id": cls[11] if len(cls) > 11 else None,
             "is_active": True,
             "student_count": student_counts.get(class_id, 0),  # Get actual student count
-            "created_at": cls[6].isoformat() if cls[6] else None,
-            "updated_at": cls[7].isoformat() if cls[7] else None
+            "created_at": cls[7].isoformat() if cls[7] else None,
+            "updated_at": cls[8].isoformat() if cls[8] else None
         })
     return {
         "items": classes_list,
@@ -1504,4 +1516,72 @@ async def get_finance_stats(
         "paid_amount": 0,
         "pending_amount": 0,
         "total_amount": 0
+    }
+
+# 用户管理
+@router.get("/users")
+async def get_all_users(
+    name: Optional[str] = None,
+    username: Optional[str] = None,
+    phone: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """获取所有用户（包括管理员、教师、学生）"""
+    query = select(User)
+    
+    # 应用筛选条件
+    filters = []
+    if name:
+        filters.append(User.full_name.ilike(f"%{name}%"))
+    if username:
+        filters.append(User.username.ilike(f"%{username}%"))
+    if phone:
+        filters.append(User.phone.ilike(f"%{phone}%"))
+    
+    if filters:
+        query = query.where(and_(*filters))
+    
+    # 执行查询
+    result = await db.execute(query)
+    users = result.scalars().all()
+    
+    # 返回结果
+    return {
+        "items": [
+            {
+                "id": user.id,
+                "username": user.username,
+                "full_name": user.full_name,
+                "email": user.email,
+                "phone": user.phone,
+                "role": user.role,
+                "is_active": user.is_active
+            }
+            for user in users
+        ],
+        "total": len(users)
+    }
+
+@router.post("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """重置用户密码为111111"""
+    # 查询用户
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 重置密码为111111
+    new_password = "111111"
+    user.hashed_password = security.get_password_hash(new_password)
+    
+    await db.commit()
+    
+    return {
+        "message": "Password reset successfully",
+        "new_password": new_password
     }

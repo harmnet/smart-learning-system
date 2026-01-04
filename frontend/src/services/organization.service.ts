@@ -3,6 +3,7 @@ import apiClient from '@/lib/api-client';
 export interface Organization {
   id: number;
   name: string;
+  code?: string | null;
   parent_id: number | null;
   level?: number;
   children?: Organization[];
@@ -19,11 +20,13 @@ export interface Organization {
 
 export interface OrganizationCreate {
   name: string;
+  code?: string | null;
   parent_id?: number | null;
 }
 
 export interface OrganizationUpdate {
   name?: string;
+  code?: string | null;
   parent_id?: number | null;
 }
 

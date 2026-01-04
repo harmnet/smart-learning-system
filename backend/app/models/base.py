@@ -35,6 +35,7 @@ class Organization(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    code = Column(String(50), unique=True, nullable=True)
     parent_id = Column(Integer, ForeignKey("organization.id"), nullable=True)
     is_active = Column(Boolean, default=True)
     created_by = Column(Integer, ForeignKey("sys_user.id"), nullable=True)
@@ -52,10 +53,12 @@ class Major(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    code = Column(String(50), unique=True, nullable=True)
     organization_id = Column(Integer, ForeignKey("organization.id"))
     tuition_fee = Column(Numeric(10, 2), nullable=False)
     description = Column(Text)
     duration_years = Column(Integer, default=4)
+    teacher_id = Column(Integer, ForeignKey("sys_user.id"), nullable=True)  # 专业负责人
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
@@ -63,6 +66,7 @@ class Major(Base):
     # Relationships
     organization = relationship("Organization", back_populates="majors")
     classes = relationship("Class", back_populates="major")
+    teacher = relationship("User", foreign_keys=[teacher_id])
 
 class Semester(Base):
     __tablename__ = "semester"

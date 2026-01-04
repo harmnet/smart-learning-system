@@ -36,6 +36,18 @@ class FolderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class FolderTreeNode(BaseModel):
+    id: int
+    folder_name: str
+    parent_id: Optional[int] = None
+    description: Optional[str] = None
+    resource_count: int = 0
+    subfolder_count: int = 0
+    children: List['FolderTreeNode'] = []
+    
+    class Config:
+        from_attributes = True
+
 @router.get("", response_model=List[FolderResponse])
 @router.get("/", response_model=List[FolderResponse])
 async def get_folders(
@@ -103,6 +115,130 @@ async def get_folders(
     
     return folder_list
 
+@router.get("/tree", response_model=List[FolderTreeNode])
+async def get_folder_tree(
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """获取文件夹树形结构"""
+    # 获取所有文件夹
+    result = await db.execute(
+        select(ResourceFolder).where(
+            and_(
+                ResourceFolder.teacher_id == teacher_id,
+                ResourceFolder.is_active == True
+            )
+        ).order_by(ResourceFolder.folder_name)
+    )
+    folders = result.scalars().all()
+    
+    # 构建文件夹字典，用于快速查找
+    folder_dict = {}
+    for folder in folders:
+        # 统计资源数
+        resource_count_result = await db.execute(
+            select(func.count(TeachingResource.id)).where(
+                and_(
+                    TeachingResource.folder_id == folder.id,
+                    TeachingResource.is_active == True
+                )
+            )
+        )
+        resource_count = resource_count_result.scalar() or 0
+        
+        # 统计子文件夹数
+        subfolder_count_result = await db.execute(
+            select(func.count(ResourceFolder.id)).where(
+                and_(
+                    ResourceFolder.parent_id == folder.id,
+                    ResourceFolder.is_active == True
+                )
+            )
+        )
+        subfolder_count = subfolder_count_result.scalar() or 0
+        
+        folder_dict[folder.id] = {
+            "id": folder.id,
+            "folder_name": folder.folder_name,
+            "parent_id": folder.parent_id,
+            "description": folder.description,
+            "resource_count": resource_count,
+            "subfolder_count": subfolder_count,
+            "children": []
+        }
+    
+    # 构建树形结构
+    root_folders = []
+    for folder_id, folder_data in folder_dict.items():
+        if folder_data["parent_id"] is None:
+            root_folders.append(folder_data)
+        else:
+            parent_id = folder_data["parent_id"]
+            if parent_id in folder_dict:
+                folder_dict[parent_id]["children"].append(folder_data)
+    
+    return root_folders
+
+@router.get("/{folder_id}/resources-recursive")
+async def get_folder_resources_recursive(
+    folder_id: int,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """递归获取文件夹及其所有子文件夹的资源"""
+    # 获取所有子文件夹ID（包括自己）
+    async def get_all_subfolder_ids(parent_id: int) -> List[int]:
+        ids = [parent_id]
+        result = await db.execute(
+            select(ResourceFolder.id).where(
+                and_(
+                    ResourceFolder.parent_id == parent_id,
+                    ResourceFolder.is_active == True
+                )
+            )
+        )
+        child_ids = result.scalars().all()
+        for child_id in child_ids:
+            ids.extend(await get_all_subfolder_ids(child_id))
+        return ids
+    
+    folder_ids = await get_all_subfolder_ids(folder_id)
+    
+    # 获取这些文件夹中的所有资源
+    from app.models.base import User
+    query = select(TeachingResource, User).join(
+        User, TeachingResource.teacher_id == User.id
+    ).where(
+        and_(
+            TeachingResource.teacher_id == teacher_id,
+            TeachingResource.folder_id.in_(folder_ids),
+            TeachingResource.is_active == True
+        )
+    ).order_by(TeachingResource.created_at.desc())
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    resources = []
+    for resource, teacher in rows:
+        resources.append({
+            "id": resource.id,
+            "teacher_id": resource.teacher_id,
+            "teacher_name": teacher.full_name,
+            "resource_name": resource.resource_name,
+            "original_filename": resource.original_filename,
+            "file_size": resource.file_size,
+            "resource_type": resource.resource_type,
+            "knowledge_point": resource.knowledge_point,
+            "folder_id": resource.folder_id,
+            "is_active": resource.is_active,
+            "created_at": resource.created_at.isoformat() if resource.created_at else None,
+            "updated_at": resource.updated_at.isoformat() if resource.updated_at else None
+        })
+    
+    return {"resources": resources, "folder_ids": folder_ids}
+
+@router.post("")
 @router.post("/")
 async def create_folder(
     folder_data: FolderCreate,

@@ -6,6 +6,8 @@ export interface KnowledgeNode {
   node_content?: string;
   parent_id?: number;
   sort_order: number;
+  resource_count?: number;
+  total_resource_count?: number;
   children?: KnowledgeNode[];
 }
 
@@ -177,6 +179,17 @@ class KnowledgeGraphService {
         },
         timeout: 120000, // 120秒超时，因为AI生成可能需要较长时间
       }
+    );
+    return response.data;
+  }
+
+  /**
+   * 递归获取知识图谱节点及其所有子节点的关联资源
+   */
+  async getNodeResourcesRecursive(graphId: number, nodeId: number, teacherId: number): Promise<any> {
+    const response = await apiClient.get(
+      `/teacher/knowledge-graphs/${graphId}/nodes/${nodeId}/resources-recursive`,
+      { params: { teacher_id: teacherId } }
     );
     return response.data;
   }

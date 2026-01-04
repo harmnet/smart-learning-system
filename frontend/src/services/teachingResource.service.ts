@@ -60,21 +60,44 @@ class TeachingResourceService {
   }
 
   /**
-   * 上传资源
+   * 上传资源（支持进度回调）
    */
   async uploadResource(
     file: File,
     data: { resource_name: string; knowledge_point?: string; folder_id?: number },
-    teacherId: number
+    teacherId: number,
+    onProgress?: (progress: number) => void
   ): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('teacher_id', teacherId.toString());
     formData.append('resource_name', data.resource_name);
     if (data.knowledge_point) formData.append('knowledge_point', data.knowledge_point);
-    if (data.folder_id) formData.append('folder_id', data.folder_id.toString());
+    if (data.folder_id !== undefined && data.folder_id !== null) {
+      formData.append('folder_id', data.folder_id.toString());
+    }
     
-    const response = await apiClient.post('/teacher/resources/upload', formData);
+    console.log('上传文件信息:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      resourceName: data.resource_name,
+      knowledgePoint: data.knowledge_point,
+      folderId: data.folder_id,
+      teacherId: teacherId
+    });
+    
+    const response = await apiClient.post('/teacher/resources/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      }
+    });
     return response.data;
   }
 
@@ -83,7 +106,7 @@ class TeachingResourceService {
    */
   async updateResource(
     resourceId: number,
-    data: { resource_name?: string; knowledge_point?: string }
+    data: { resource_name?: string; knowledge_point?: string; folder_id?: number }
   ): Promise<any> {
     const response = await apiClient.put(`/teacher/resources/${resourceId}`, data);
     return response.data;
@@ -121,6 +144,35 @@ class TeachingResourceService {
     }
     
     return `${apiBase}/teacher/resources/${resourceId}/preview`;
+  }
+
+  /**
+   * 获取WebOffice在线预览URL
+   */
+  async getWebOfficePreviewUrl(
+    resourceId: number,
+    options?: {
+      expires?: number;
+      allow_export?: boolean;
+      allow_print?: boolean;
+      watermark?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    preview_url: string;
+    resource_id: number;
+    resource_name: string;
+    resource_type: string;
+    expires_in: number;
+  }> {
+    const params: any = {};
+    if (options?.expires) params.expires = options.expires;
+    if (options?.allow_export !== undefined) params.allow_export = options.allow_export;
+    if (options?.allow_print !== undefined) params.allow_print = options.allow_print;
+    if (options?.watermark) params.watermark = options.watermark;
+    
+    const response = await apiClient.get(`/teacher/resources/${resourceId}/weboffice-url`, { params });
+    return response.data;
   }
 
   /**

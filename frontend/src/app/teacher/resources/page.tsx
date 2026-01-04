@@ -2,56 +2,60 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { teachingResourceService, TeachingResource } from '@/services/teachingResource.service';
-import { resourceFolderService, ResourceFolder } from '@/services/resourceFolder.service';
+import { resourceFolderService, FolderTreeNode } from '@/services/resourceFolder.service';
+import { knowledgeGraphService, KnowledgeGraph, GraphTree, KnowledgeNode } from '@/services/knowledgeGraph.service';
 import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
 import Modal from '@/components/common/Modal';
-import ResourcePreviewModal from '@/components/teacher/ResourcePreviewModal';
-import KnowledgeGraphTreeSelect from '@/components/common/KnowledgeGraphTreeSelect';
+import Toast from '@/components/common/Toast';
 
 export default function TeachingResourcesPage() {
   const { t } = useLanguage();
+  
+  // 基础状态
   const [resources, setResources] = useState<TeachingResource[]>([]);
-  const [folders, setFolders] = useState<ResourceFolder[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
-  const [folderPath, setFolderPath] = useState<ResourceFolder[]>([]);
+  const [displayedResources, setDisplayedResources] = useState<TeachingResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'folder' | 'knowledge'>('folder'); // 查看维度：文件夹或知识点
-  const [selectedKnowledgePoint, setSelectedKnowledgePoint] = useState<string | null>(null); // 选中的知识点
+  const [viewMode, setViewMode] = useState<'folder' | 'knowledge'>('folder');
   
-  // Modals
+  // 文件夹相关状态
+  const [folderTree, setFolderTree] = useState<FolderTreeNode[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<number>>(new Set());
+  
+  // 知识图谱相关状态
+  const [knowledgeGraphs, setKnowledgeGraphs] = useState<KnowledgeGraph[]>([]);
+  const [selectedGraphId, setSelectedGraphId] = useState<number | null>(null);
+  const [graphTree, setGraphTree] = useState<GraphTree | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<number>>(new Set());
+  
+  // 排序状态
+  const [sortBy, setSortBy] = useState<'created_at' | 'resource_name'>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // 筛选和分页状态
+  const [filterType, setFilterType] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  
+  // Modal和表单状态
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [folderModalOpen, setFolderModalOpen] = useState(false);
-  const [editResourceModalOpen, setEditResourceModalOpen] = useState(false);
-  const [editFolderModalOpen, setEditFolderModalOpen] = useState(false);
-  const [moveModalOpen, setMoveModalOpen] = useState(false);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [previewResource, setPreviewResource] = useState<TeachingResource | null>(null);
-  
-  // Edit folder form states
-  const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
-  const [editFolderName, setEditFolderName] = useState('');
-  const [editFolderDescription, setEditFolderDescription] = useState('');
-  
-  // Form states
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingResource, setEditingResource] = useState<TeachingResource | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [resourceName, setResourceName] = useState('');
-  const [knowledgePoint, setKnowledgePoint] = useState<string | null>(null);
-  const [folderName, setFolderName] = useState('');
-  const [folderDescription, setFolderDescription] = useState('');
-  const [selectedResource, setSelectedResource] = useState<TeachingResource | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState<ResourceFolder | null>(null);
-  const [moveItem, setMoveItem] = useState<{type: 'resource' | 'folder', id: number} | null>(null);
-  const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
+  const [knowledgePoint, setKnowledgePoint] = useState<string>('');
+  const [resourceFolderId, setResourceFolderId] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   
-  // Edit resource states
-  const [editingResource, setEditingResource] = useState<TeachingResource | null>(null);
-  const [editResourceName, setEditResourceName] = useState('');
-  const [editKnowledgePoint, setEditKnowledgePoint] = useState<string | null>(null);
+  // Toast状态
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   
+  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // 获取当前教师ID
   const getTeacherId = (): number | undefined => {
@@ -69,985 +73,1061 @@ export default function TeachingResourcesPage() {
     return undefined;
   };
 
+  // 获取文件夹完整路径
+  const getFolderPath = (folderId: number | null): string => {
+    if (!folderId) return t.teacher.teachingResources.folder.noFolder;
+    
+    const findPath = (nodes: FolderTreeNode[], targetId: number, path: string[] = []): string[] | null => {
+      for (const node of nodes) {
+        if (node.id === targetId) {
+          return [...path, node.folder_name];
+        }
+        if (node.children && node.children.length > 0) {
+          const result = findPath(node.children, targetId, [...path, node.folder_name]);
+          if (result) return result;
+        }
+      }
+      return null;
+    };
+    
+    const pathArray = findPath(folderTree, folderId);
+    return pathArray ? pathArray.join(' / ') : `#${folderId}`;
+  };
+
+  // 获取知识点完整路径
+  const getKnowledgePointPath = (knowledgePoint: string | null): string => {
+    if (!knowledgePoint) return '-';
+    
+    // 如果graphTree存在，尝试查找完整路径
+    if (graphTree && graphTree.tree) {
+      const findPath = (nodes: KnowledgeNode[], targetName: string, path: string[] = []): string[] | null => {
+        for (const node of nodes) {
+          if (node.node_name === targetName) {
+            return [...path, node.node_name];
+          }
+          if (node.children && node.children.length > 0) {
+            const result = findPath(node.children, targetName, [...path, node.node_name]);
+            if (result) return result;
+          }
+        }
+        return null;
+      };
+      
+      const pathArray = findPath(graphTree.tree, knowledgePoint);
+      if (pathArray) return pathArray.join(' / ');
+    }
+    
+    // 如果找不到，直接返回知识点名称
+    return knowledgePoint;
+  };
+  
+  // 渲染文件类型标签
+  const renderTypeLabel = (type: string) => {
+    const typeMap: { [key: string]: { label: string; color: string } } = {
+      'pdf': { label: 'PDF', color: 'bg-red-100 text-red-700' },
+      'word': { label: 'Word', color: 'bg-blue-100 text-blue-700' },
+      'excel': { label: 'Excel', color: 'bg-green-100 text-green-700' },
+      'ppt': { label: 'PPT', color: 'bg-orange-100 text-orange-700' },
+      'video': { label: 'MP4', color: 'bg-purple-100 text-purple-700' },
+      'markdown': { label: 'MD', color: 'bg-gray-100 text-gray-700' },
+      'image': { label: 'IMG', color: 'bg-pink-100 text-pink-700' },
+      'zip': { label: 'ZIP', color: 'bg-yellow-100 text-yellow-700' },
+      'txt': { label: 'TXT', color: 'bg-gray-100 text-gray-600' },
+      'question': { label: '试题', color: 'bg-indigo-100 text-indigo-700' },
+    };
+    
+    const typeInfo = typeMap[type.toLowerCase()] || { label: type.toUpperCase(), color: 'bg-gray-100 text-gray-500' };
+    
+    return (
+      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${typeInfo.color}`}>
+        {typeInfo.label}
+      </span>
+    );
+  };
+
+  // 初始化加载
   useEffect(() => {
     const teacherId = getTeacherId();
     if (teacherId) {
       if (viewMode === 'folder') {
-        loadFolders(teacherId);
+        loadFolderTree(teacherId);
+      } else {
+        loadKnowledgeGraphs(teacherId);
       }
-      loadResources(teacherId);
     }
-  }, [currentFolderId, selectedType, searchTerm, viewMode, selectedKnowledgePoint]);
+  }, [viewMode]);
 
-  const loadFolders = async (teacherId: number) => {
-    try {
-      const data = await resourceFolderService.getFolders(teacherId, currentFolderId || undefined);
-      setFolders(data);
-    } catch (error: any) {
-      console.error('Failed to load folders:', error);
-      const errorMessage = error.response?.data?.detail || error.message || '加载文件夹失败';
-      console.error(`错误: ${errorMessage}`);
-    }
-  };
+  // 防止浏览器默认拖拽行为
+  useEffect(() => {
+    const preventDefaults = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('dragover', preventDefaults);
+    window.addEventListener('drop', preventDefaults);
+    return () => {
+      window.removeEventListener('dragover', preventDefaults);
+      window.removeEventListener('drop', preventDefaults);
+    };
+  }, []);
 
-  const loadResources = async (teacherId: number) => {
+  // 加载文件夹树
+  const loadFolderTree = async (teacherId: number) => {
     try {
       setLoading(true);
-      // 在知识点模式下，如果选中了知识点，使用知识点作为搜索条件
-      const searchKeyword = viewMode === 'knowledge' && selectedKnowledgePoint 
-        ? selectedKnowledgePoint 
-        : searchTerm || undefined;
+      const tree = await resourceFolderService.getFolderTree(teacherId);
+      setFolderTree(tree);
       
-      const data = await teachingResourceService.getAll(
-        teacherId,
-        0, 
-        1000, // 增加数量以支持分组显示
-        selectedType || undefined, 
-        searchKeyword,
-        viewMode === 'folder' ? (currentFolderId === null ? undefined : currentFolderId) : undefined
-      );
-      setResources(data);
+      // 默认展开所有根文件夹
+      if (tree && tree.length > 0) {
+        const rootFolderIds = new Set<number>();
+        tree.forEach(folder => {
+          rootFolderIds.add(folder.id);
+        });
+        setExpandedFolderIds(rootFolderIds);
+      }
     } catch (error: any) {
-      console.error('Failed to load resources:', error);
-      const errorMessage = error.response?.data?.detail || error.message || '加载教学资源失败';
-      alert(`错误: ${errorMessage}\n\n请检查：\n1. 后端服务是否运行在 http://localhost:8000\n2. 网络连接是否正常`);
+      console.error('Failed to load folder tree:', error);
+      setToast({ message: '加载文件夹树失败', type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateFolder = async () => {
-    const teacherId = getTeacherId();
-    if (!teacherId) {
-      alert('无法获取教师信息');
-      return;
-    }
-    if (!folderName.trim()) {
-      alert(t.teacher.teachingResources.folder.folderNamePlaceholder);
-      return;
-    }
+  // 加载知识图谱列表
+  const loadKnowledgeGraphs = async (teacherId: number) => {
     try {
-      await resourceFolderService.createFolder(teacherId, {
-        folder_name: folderName,
-        parent_id: currentFolderId || undefined,
-        description: folderDescription || undefined,
-      });
-      alert(t.teacher.teachingResources.folder.createSuccess);
-      setFolderModalOpen(false);
-      setFolderName('');
-      setFolderDescription('');
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadFolders(teacherIdForReload);
+      setLoading(true);
+      const graphs = await knowledgeGraphService.getAll(teacherId);
+      setKnowledgeGraphs(graphs);
+      if (graphs.length > 0 && !selectedGraphId) {
+        // 默认选择第一个图谱
+        setSelectedGraphId(graphs[0].id);
+        loadGraphTree(graphs[0].id, teacherId);
       }
     } catch (error: any) {
-      console.error('Failed to create folder:', error);
-      alert(t.teacher.teachingResources.folder.createError + ': ' + (error.response?.data?.detail || error.message));
+      console.error('Failed to load knowledge graphs:', error);
+      setToast({ message: '加载知识图谱失败', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUploadResource = async () => {
-    const teacherId = getTeacherId();
-    if (!teacherId) {
-      alert('无法获取教师信息');
-      return;
-    }
-    if (!uploadFile) {
-      alert(t.teacher.teachingResources.pleaseSelectFile);
-      return;
-    }
+  // 加载图谱树
+  const loadGraphTree = async (graphId: number, teacherId: number) => {
     try {
-      await teachingResourceService.uploadResource(uploadFile, {
-        resource_name: resourceName || uploadFile.name,
-        knowledge_point: knowledgePoint || undefined,
-        folder_id: currentFolderId || undefined,
-      }, teacherId);
-      alert(t.teacher.teachingResources.uploadSuccess);
-      setUploadModalOpen(false);
-      resetUploadForm();
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadResources(teacherIdForReload);
+      const tree = await knowledgeGraphService.getTree(graphId, teacherId);
+      setGraphTree(tree);
+      
+      // 默认展开所有根节点
+      if (tree && tree.tree) {
+        const rootNodeIds = new Set<number>();
+        tree.tree.forEach((node: KnowledgeNode) => {
+          rootNodeIds.add(node.id);
+        });
+        setExpandedNodeIds(rootNodeIds);
       }
     } catch (error: any) {
-      console.error('Failed to upload resource:', error);
-      alert(t.teacher.teachingResources.uploadError + ': ' + (error.response?.data?.detail || error.message));
+      console.error('Failed to load graph tree:', error);
+      setToast({ message: '加载知识图谱树失败', type: 'error' });
     }
   };
 
-  const handleEditFolderClick = (folder: ResourceFolder) => {
-    setEditingFolder(folder);
-    setEditFolderName(folder.folder_name);
-    setEditFolderDescription(folder.description || '');
-    setEditFolderModalOpen(true);
-  };
-
-  const handleUpdateFolder = async () => {
+  // 点击文件夹，加载该文件夹及子文件夹的资源
+  const handleFolderClick = async (folderId: number) => {
     const teacherId = getTeacherId();
-    if (!teacherId) {
-      alert('无法获取教师信息');
-      return;
-    }
-    if (!editingFolder || !editFolderName.trim()) {
-      alert(t.teacher.teachingResources.folder.folderNamePlaceholder);
-      return;
-    }
+    if (!teacherId) return;
+    
     try {
-      await resourceFolderService.updateFolder(editingFolder.id, teacherId, {
-        folder_name: editFolderName,
-        description: editFolderDescription || undefined,
-      });
-      alert(t.teacher.teachingResources.folder.updateSuccess);
-      setEditFolderModalOpen(false);
-      setEditingFolder(null);
-      setEditFolderName('');
-      setEditFolderDescription('');
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadFolders(teacherIdForReload);
-      }
+      setLoading(true);
+      setSelectedFolderId(folderId);
+      const result = await resourceFolderService.getFolderResourcesRecursive(folderId, teacherId);
+      setResources(result.resources || []);
     } catch (error: any) {
-      console.error('Failed to update folder:', error);
-      alert(t.teacher.teachingResources.folder.updateError + ': ' + (error.response?.data?.detail || error.message));
+      console.error('Failed to load folder resources:', error);
+      setToast({ message: '加载资源失败', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handlePreviewResource = (resource: TeachingResource) => {
-    setPreviewResource(resource);
-    setPreviewModalOpen(true);
-  };
-
-  const handleDeleteFolder = async (folder: ResourceFolder) => {
+  // 点击知识图谱节点，加载该节点及子节点的资源
+  const handleNodeClick = async (nodeId: number) => {
     const teacherId = getTeacherId();
-    if (!teacherId) {
-      alert('无法获取教师信息');
-      return;
-    }
-    if (!confirm(t.teacher.teachingResources.folder.deleteConfirm)) return;
+    if (!teacherId || !selectedGraphId) return;
+    
     try {
-      await resourceFolderService.deleteFolder(folder.id, teacherId);
-      alert(t.teacher.teachingResources.folder.deleteSuccess);
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadFolders(teacherIdForReload);
-      }
+      setLoading(true);
+      setSelectedNodeId(nodeId);
+      const result = await knowledgeGraphService.getNodeResourcesRecursive(selectedGraphId, nodeId, teacherId);
+      setResources(result.resources || []);
     } catch (error: any) {
-      console.error('Failed to delete folder:', error);
-      alert(t.teacher.teachingResources.folder.deleteError + ': ' + (error.response?.data?.detail || error.message));
+      console.error('Failed to load node resources:', error);
+      setToast({ message: '加载资源失败', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
+  // 切换文件夹展开/折叠
+  const toggleFolderExpand = (folderId: number) => {
+    const newExpanded = new Set(expandedFolderIds);
+    if (newExpanded.has(folderId)) {
+      newExpanded.delete(folderId);
+    } else {
+      newExpanded.add(folderId);
+    }
+    setExpandedFolderIds(newExpanded);
+  };
+
+  // 切换节点展开/折叠
+  const toggleNodeExpand = (nodeId: number) => {
+    const newExpanded = new Set(expandedNodeIds);
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId);
+    } else {
+      newExpanded.add(nodeId);
+    }
+    setExpandedNodeIds(newExpanded);
+  };
+
+  // 排序、筛选和分页资源
+  useEffect(() => {
+    // 筛选
+    let filtered = resources;
+    if (filterType !== 'all') {
+      filtered = resources.filter(r => r.resource_type.toLowerCase() === filterType.toLowerCase());
+    }
+    
+    // 排序
+    const sorted = [...filtered].sort((a, b) => {
+      let compareValue = 0;
+      if (sortBy === 'created_at') {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        compareValue = dateA - dateB;
+      } else if (sortBy === 'resource_name') {
+        compareValue = a.resource_name.localeCompare(b.resource_name);
+      }
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+    
+    setDisplayedResources(sorted);
+    setCurrentPage(1); // 重置到第一页
+  }, [resources, sortBy, sortOrder, filterType]);
+  
+  // 计算分页数据
+  const totalPages = Math.ceil(displayedResources.length / pageSize);
+  const paginatedResources = displayedResources.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // 切换排序
+  const handleSort = (field: 'created_at' | 'resource_name') => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'created_at' ? 'desc' : 'asc');
+    }
+  };
+
+  // 打开编辑Modal
   const handleEditResource = (resource: TeachingResource) => {
     setEditingResource(resource);
-    setEditResourceName(resource.resource_name);
-    setEditKnowledgePoint(resource.knowledge_point || null);
-    setEditResourceModalOpen(true);
+    setResourceName(resource.resource_name);
+    setKnowledgePoint(resource.knowledge_point || '');
+    setResourceFolderId(resource.folder_id ?? null);
+    setEditModalOpen(true);
   };
 
-  const handleUpdateResource = async () => {
-    if (!editingResource || !editResourceName.trim()) {
-      alert(t.teacher.teachingResources.resourceNamePlaceholder);
+  // 保存编辑
+  const handleSaveEdit = async () => {
+    if (!editingResource) return;
+    
+    // 验证必填项
+    if (!resourceName.trim()) {
+      setToast({ message: t.teacher.teachingResources.resourceNamePlaceholder, type: 'warning' });
       return;
     }
+    
+    if (!resourceFolderId) {
+      setToast({ message: '请选择文件夹', type: 'warning' });
+      return;
+    }
+    
+    if (!knowledgePoint.trim()) {
+      setToast({ message: '请输入知识点', type: 'warning' });
+      return;
+    }
+    
     try {
+      const teacherId = getTeacherId();
+      if (!teacherId) {
+        setToast({ message: '无法获取教师ID', type: 'error' });
+        return;
+      }
+      
       await teachingResourceService.updateResource(editingResource.id, {
-        resource_name: editResourceName,
-        knowledge_point: editKnowledgePoint || undefined,
+        resource_name: resourceName,
+        knowledge_point: knowledgePoint,
+        folder_id: resourceFolderId ?? undefined,
       });
-      alert(t.teacher.teachingResources.updateSuccess);
-      setEditResourceModalOpen(false);
+      
+      setToast({ message: t.teacher.teachingResources.updateSuccess, type: 'success' });
+      setEditModalOpen(false);
       setEditingResource(null);
-      setEditResourceName('');
-      setEditKnowledgePoint(null);
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadResources(teacherIdForReload);
+      setResourceName('');
+      setKnowledgePoint('');
+      setResourceFolderId(null);
+      
+      // 重新加载资源列表
+      if (viewMode === 'folder' && selectedFolderId) {
+        await handleFolderClick(selectedFolderId);
+      } else if (viewMode === 'knowledge' && selectedNodeId) {
+        await handleNodeClick(selectedNodeId);
       }
     } catch (error: any) {
       console.error('Failed to update resource:', error);
-      alert(t.teacher.teachingResources.updateError + ': ' + (error.response?.data?.detail || error.message));
+      setToast({ message: error.response?.data?.detail || t.teacher.teachingResources.updateError, type: 'error' });
     }
   };
 
-  const handleDeleteResource = async (resource: TeachingResource) => {
-    if (!confirm(t.teacher.teachingResources.deleteConfirm)) return;
-    try {
-      await teachingResourceService.deleteResource(resource.id);
-      alert(t.teacher.teachingResources.deleteSuccess);
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadResources(teacherIdForReload);
-      }
-    } catch (error: any) {
-      console.error('Failed to delete resource:', error);
-      alert(t.teacher.teachingResources.deleteError + ': ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  const handleMove = async () => {
+  // 上传资源
+  const handleUploadResource = async () => {
     const teacherId = getTeacherId();
     if (!teacherId) {
-      alert('无法获取教师信息');
+      setToast({ message: '无法获取教师信息', type: 'error' });
       return;
     }
-    if (!moveItem) return;
-    try {
-      if (moveItem.type === 'folder') {
-        await resourceFolderService.moveFolder(moveItem.id, teacherId, targetFolderId || undefined);
-      } else {
-        await resourceFolderService.moveResource(moveItem.id, teacherId, targetFolderId || undefined);
-      }
-      alert(t.teacher.teachingResources.folder.moveSuccess);
-      setMoveModalOpen(false);
-      setMoveItem(null);
-      setTargetFolderId(null);
-      const teacherIdForReload = getTeacherId();
-      if (teacherIdForReload) {
-        loadFolders(teacherIdForReload);
-        loadResources(teacherIdForReload);
-      }
-    } catch (error: any) {
-      console.error('Failed to move:', error);
-      alert(t.teacher.teachingResources.folder.moveError + ': ' + (error.response?.data?.detail || error.message));
+    if (!uploadFile) {
+      setToast({ message: '请选择文件', type: 'warning' });
+      return;
     }
-  };
-
-  const handleFolderClick = (folder: ResourceFolder) => {
-    setCurrentFolderId(folder.id);
-    setFolderPath([...folderPath, folder]);
-  };
-
-  const handleBackToParent = () => {
-    if (folderPath.length > 0) {
-      const newPath = [...folderPath];
-      newPath.pop();
-      setFolderPath(newPath);
-      setCurrentFolderId(newPath.length > 0 ? newPath[newPath.length - 1].id : null);
+    
+    // 验证必填项
+    if (!resourceName.trim()) {
+      setToast({ message: '请输入资源名称', type: 'warning' });
+      return;
+    }
+    
+    if (!resourceFolderId) {
+      setToast({ message: '请选择文件夹', type: 'warning' });
+      return;
+    }
+    
+    if (!knowledgePoint.trim()) {
+      setToast({ message: '请输入知识点', type: 'warning' });
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      await teachingResourceService.uploadResource(
+        uploadFile,
+        {
+          resource_name: resourceName,
+          knowledge_point: knowledgePoint,
+          folder_id: resourceFolderId,
+        },
+        teacherId,
+        (progress) => {
+          setUploadProgress(progress);
+        }
+      );
+      
+      setUploadProgress(100);
+      setToast({ message: '上传成功', type: 'success' });
+      
+      setTimeout(() => {
+        setUploadModalOpen(false);
+        resetUploadForm();
+        setIsUploading(false);
+        setUploadProgress(0);
+        
+        // 重新加载资源
+        if (viewMode === 'folder' && selectedFolderId) {
+          handleFolderClick(selectedFolderId);
+        } else if (viewMode === 'knowledge' && selectedNodeId) {
+          handleNodeClick(selectedNodeId);
+        }
+      }, 500);
+    } catch (error: any) {
+      console.error('Failed to upload resource:', error);
+      setToast({ message: '上传失败: ' + (error.response?.data?.detail || error.message), type: 'error' });
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const resetUploadForm = () => {
     setUploadFile(null);
     setResourceName('');
-    setKnowledgePoint(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setKnowledgePoint('');
+    setResourceFolderId(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-  };
-
-  const getFileTypeIcon = (type: string) => {
-    const typeMap: { [key: string]: { label: string; bgColor: string; textColor: string } } = {
-      'video': { label: 'VIDEO', bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
-      'ppt': { label: 'PPT', bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
-      'pdf': { label: 'PDF', bgColor: 'bg-red-50', textColor: 'text-red-600' },
-      'word': { label: 'WORD', bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
-      'excel': { label: 'EXCEL', bgColor: 'bg-green-50', textColor: 'text-green-600' },
-      'markdown': { label: 'MD', bgColor: 'bg-slate-50', textColor: 'text-slate-600' },
-      'image': { label: 'IMG', bgColor: 'bg-pink-50', textColor: 'text-pink-600' },
-    };
-    return typeMap[type.toLowerCase()] || { label: 'FILE', bgColor: 'bg-slate-50', textColor: 'text-slate-600' };
-  };
-
-  const getFolderNameById = (folderId: number | null): string => {
-    if (!folderId) return t.teacher.teachingResources.folder.rootFolder;
-    // 如果是当前文件夹路径中的
-    const folder = folderPath.find(f => f.id === folderId);
-    if (folder) return folder.folder_name;
-    // 如果是子文件夹
-    const subfolder = folders.find(f => f.id === folderId);
-    if (subfolder) return subfolder.folder_name;
-    return t.teacher.teachingResources.folder.rootFolder;
-  };
-
-  // 按知识点分组资源
-  const groupResourcesByKnowledgePoint = (resources: TeachingResource[]) => {
-    const grouped: { [key: string]: TeachingResource[] } = {
-      '未分类': []
-    };
-    
-    resources.forEach(resource => {
-      const key = resource.knowledge_point || '未分类';
-      if (!grouped[key]) {
-        grouped[key] = [];
+  // 文件选择
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+      if (!resourceName) {
+        setResourceName(file.name);
       }
-      grouped[key].push(resource);
-    });
-    
-    return grouped;
+    }
   };
 
-  // 过滤资源（支持搜索）
-  const filterResources = (resources: TeachingResource[]) => {
-    if (!searchTerm && !selectedKnowledgePoint) {
-      return resources;
+  // 拖拽上传
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      setUploadFile(file);
+      if (!resourceName) {
+        setResourceName(file.name);
+      }
+    }
+  };
+
+  // WebOffice预览
+  const handleWebOfficePreview = async (resource: TeachingResource) => {
+    const supportedTypes = ['word', 'excel', 'ppt', 'pdf'];
+    if (!supportedTypes.includes(resource.resource_type.toLowerCase())) {
+      setToast({ message: '该文件类型不支持在线预览', type: 'warning' });
+      return;
     }
     
-    return resources.filter(resource => {
-      // 知识点模式下，如果选中了知识点，只显示该知识点的资源
-      if (viewMode === 'knowledge' && selectedKnowledgePoint) {
-        if (resource.knowledge_point !== selectedKnowledgePoint) {
-          return false;
-        }
-      }
+    try {
+      setToast({ message: '正在生成预览链接...', type: 'info' });
       
-      // 搜索功能：搜索资源名称、知识点、文件夹名称
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matchesName = resource.resource_name.toLowerCase().includes(searchLower);
-        const matchesKnowledge = resource.knowledge_point?.toLowerCase().includes(searchLower) || false;
-        const folderName = getFolderNameById(resource.folder_id || null).toLowerCase();
-        const matchesFolder = folderName.includes(searchLower);
-        
-        // 只要有一个字段匹配就显示
-        if (!matchesName && !matchesKnowledge && !matchesFolder) {
-          return false;
-        }
-      }
+      const result = await teachingResourceService.getWebOfficePreviewUrl(resource.id, {
+        expires: 3600,
+        allow_export: true,
+        allow_print: true,
+        watermark: '内部资料'
+      });
       
-      return true;
-    });
+      if (result.success && result.preview_url) {
+        window.open(result.preview_url, '_blank');
+        setToast({ message: '预览链接已生成', type: 'success' });
+      } else {
+        setToast({ message: '生成预览链接失败', type: 'error' });
+      }
+    } catch (error: any) {
+      console.error('Failed to get WebOffice preview URL:', error);
+      const errorMsg = error.response?.data?.detail || error.message || '生成预览链接失败';
+      setToast({ message: errorMsg, type: 'error' });
+    }
   };
 
-  // 资源卡片组件
-  const renderResourceCard = (resource: TeachingResource) => (
-    <div key={resource.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
-      <div className="flex items-start justify-between mb-3">
-        {(() => {
-          const icon = getFileTypeIcon(resource.resource_type);
-          return (
-            <div className={`px-3 py-2 ${icon.bgColor} rounded-lg flex items-center justify-center`}>
-              <span className={`text-xs font-bold ${icon.textColor}`}>{icon.label}</span>
-            </div>
-          );
-        })()}
-        <div className="flex gap-1">
-          <button
-            onClick={() => handleEditResource(resource)}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-            title="编辑资源"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-            </svg>
-          </button>
-          <button
-            onClick={() => {
-              setMoveItem({type: 'resource', id: resource.id});
-              setMoveModalOpen(true);
-            }}
-            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-            title="移动资源"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-            </svg>
-          </button>
-          <button
-            onClick={() => handleDeleteResource(resource)}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-            title="删除资源"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <h3 className="font-bold text-slate-900 mb-1 truncate">{resource.resource_name}</h3>
-      {viewMode === 'folder' && (
-        <div className="flex items-center gap-2 mb-2">
-          <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-          </svg>
-          <span className="text-xs text-slate-500 truncate">{getFolderNameById(resource.folder_id || null)}</span>
-        </div>
-      )}
-      {resource.knowledge_point && (
-        <div className="flex items-center gap-2 mb-2">
-          <svg className="w-3 h-3 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-          </svg>
-          <span className="text-xs text-purple-600 truncate">{resource.knowledge_point}</span>
-        </div>
-      )}
-      <p className="text-xs text-slate-500 mb-3">{formatFileSize(resource.file_size)}</p>
-      <div className="flex gap-2">
-        <button
-          onClick={() => handlePreviewResource(resource)}
-          className="flex-1 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+  // 渲染文件夹下拉选项（带缩进）
+  const renderFolderOptions = (node: FolderTreeNode, level: number = 0): JSX.Element[] => {
+    const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(level); // 使用空格缩进
+    const options: JSX.Element[] = [
+      <option key={node.id} value={node.id}>
+        {indent}{level > 0 ? '├─ ' : ''}{node.folder_name}
+      </option>
+    ];
+    
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => {
+        options.push(...renderFolderOptions(child, level + 1));
+      });
+    }
+    
+    return options;
+  };
+
+  // 渲染知识点下拉选项（带缩进）
+  const renderKnowledgeOptions = (node: KnowledgeNode, level: number = 0): JSX.Element[] => {
+    const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(level); // 使用空格缩进
+    const options: JSX.Element[] = [
+      <option key={node.id} value={node.node_name}>
+        {indent}{level > 0 ? '├─ ' : ''}{node.node_name}
+      </option>
+    ];
+    
+    if (node.children && node.children.length > 0) {
+      node.children.forEach(child => {
+        options.push(...renderKnowledgeOptions(child, level + 1));
+      });
+    }
+    
+    return options;
+  };
+
+  // 渲染文件夹树节点
+  const renderFolderTreeNode = (node: FolderTreeNode, level: number = 0) => {
+    const isExpanded = expandedFolderIds.has(node.id);
+    const isSelected = selectedFolderId === node.id;
+    const hasChildren = node.children && node.children.length > 0;
+    
+    return (
+      <div key={node.id} className="folder-node">
+        <div
+          className={`folder-item flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-100 rounded ${
+            isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+          }`}
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          onClick={() => handleFolderClick(node.id)}
         >
-          {t.teacher.teachingResources.preview}
-        </button>
-        <button
-          onClick={() => window.open(teachingResourceService.getDownloadUrl(resource.id), '_blank')}
-          className="flex-1 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-        >
-          {t.teacher.teachingResources.download}
-        </button>
+          {hasChildren && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolderExpand(node.id);
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              {isExpanded ? '▼' : '▶'}
+            </button>
+          )}
+          {!hasChildren && <span className="w-4" />}
+          <span className="flex-1">{node.folder_name}</span>
+          <span className="text-xs text-gray-500">({node.resource_count})</span>
+        </div>
+        {isExpanded && hasChildren && (
+          <div className="children">
+            {node.children.map(child => renderFolderTreeNode(child, level + 1))}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  // 渲染知识图谱树节点
+  const renderGraphTreeNode = (node: KnowledgeNode, level: number = 0) => {
+    const isExpanded = expandedNodeIds.has(node.id);
+    const isSelected = selectedNodeId === node.id;
+    const hasChildren = node.children && node.children.length > 0;
+    
+    return (
+      <div key={node.id} className="node-item">
+        <div
+          className={`flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-100 rounded ${
+            isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+          }`}
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          onClick={() => handleNodeClick(node.id)}
+        >
+          {hasChildren && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleNodeExpand(node.id);
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              {isExpanded ? '▼' : '▶'}
+            </button>
+          )}
+          {!hasChildren && <span className="w-4" />}
+          <span className="flex-1">{node.node_name}</span>
+          <span className="text-xs text-gray-500">({node.total_resource_count || 0})</span>
+        </div>
+        {isExpanded && hasChildren && (
+          <div className="children">
+            {node.children?.map((child: KnowledgeNode) => renderGraphTreeNode(child, level + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <TeacherLayout>
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-100 bg-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 mb-1">{t.teacher.teachingResources.title}</h1>
-              <p className="text-sm text-slate-500">{t.teacher.teachingResources.subtitle}</p>
-            </div>
-            <div className="flex gap-3">
+      <div className="teaching-resources-page p-6">
+        {/* 标题和按钮 */}
+        <div className="header mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold">{t.teacher.teachingResources.title}</h1>
+            <div className="view-mode-switch flex gap-2">
               <button
-                onClick={() => setFolderModalOpen(true)}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20 flex items-center gap-2"
+                onClick={() => setViewMode('folder')}
+                className={`px-3 py-1 text-sm rounded flex items-center gap-1 ${viewMode === 'folder' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
-                {t.teacher.teachingResources.folder.create}
+                <span>{t.teacher.teachingResources.viewMode.folder}</span>
               </button>
               <button
-                onClick={() => setUploadModalOpen(true)}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                onClick={() => setViewMode('knowledge')}
+                className={`px-3 py-1 text-sm rounded flex items-center gap-1 ${viewMode === 'knowledge' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
                 </svg>
-                {t.teacher.teachingResources.upload}
+                <span>{t.teacher.teachingResources.viewMode.knowledge}</span>
               </button>
             </div>
           </div>
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span>{t.teacher.teachingResources.upload}</span>
+          </button>
         </div>
 
-        {/* Breadcrumb */}
-        {viewMode === 'folder' && folderPath.length > 0 && (
-          <div className="px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-            <button
-              onClick={() => {
-                setCurrentFolderId(null);
-                setFolderPath([]);
-              }}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {t.teacher.teachingResources.folder.rootFolder}
-            </button>
-            {folderPath.map((folder, index) => (
-              <div key={folder.id} className="flex items-center gap-2">
-                <span className="text-slate-400">/</span>
-                <button
-                  onClick={() => {
-                    const newPath = folderPath.slice(0, index + 1);
-                    setFolderPath(newPath);
-                    setCurrentFolderId(folder.id);
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  {folder.folder_name}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search and View Mode */}
-        <div className="px-8 py-4 bg-white border-b border-slate-100">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => {
-                  setViewMode('folder');
-                  setSelectedKnowledgePoint(null);
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'folder'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                  </svg>
-                  {t.teacher.teachingResources.viewMode.folder}
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('knowledge');
-                  setCurrentFolderId(null);
-                  setFolderPath([]);
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  viewMode === 'knowledge'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                  </svg>
-                  {t.teacher.teachingResources.viewMode.knowledge}
-                </span>
-              </button>
-            </div>
-
-            {/* Search Bar */}
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={t.teacher.teachingResources.searchPlaceholder}
-                  className="w-full px-4 py-2 pl-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                  </button>
+        {/* 主要内容区域 */}
+        <div className="main-content flex gap-4">
+          {/* 左侧：树形结构 */}
+          <div className="tree-panel w-1/5 bg-white rounded-lg shadow p-3 max-h-[calc(100vh-180px)] overflow-y-auto text-sm">
+            {viewMode === 'folder' ? (
+              <div className="folder-tree">
+                <h3 className="text-lg font-semibold mb-4">文件夹结构</h3>
+                {loading ? (
+                  <div className="text-center py-4">加载中...</div>
+                ) : folderTree.length > 0 ? (
+                  folderTree.map(node => renderFolderTreeNode(node))
+                ) : (
+                  <div className="text-center text-gray-500 py-4">暂无文件夹</div>
                 )}
               </div>
-            </div>
-
-            {/* Type Filter */}
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">{t.teacher.teachingResources.types.all}</option>
-              <option value="video">{t.teacher.teachingResources.types.video}</option>
-              <option value="ppt">{t.teacher.teachingResources.types.ppt}</option>
-              <option value="pdf">{t.teacher.teachingResources.types.pdf}</option>
-              <option value="word">{t.teacher.teachingResources.types.word}</option>
-              <option value="excel">{t.teacher.teachingResources.types.excel}</option>
-              <option value="markdown">{t.teacher.teachingResources.types.markdown}</option>
-              <option value="image">{t.teacher.teachingResources.types.image}</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-8">
-          {/* Folders - 只在文件夹模式下显示 */}
-          {viewMode === 'folder' && folders.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-slate-900 mb-4">{t.teacher.teachingResources.folder.title}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {folders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow cursor-pointer group"
-                    onClick={() => handleFolderClick(folder)}
+            ) : (
+              <div className="knowledge-tree">
+                <h3 className="text-lg font-semibold mb-4">知识图谱</h3>
+                {/* 图谱选择 */}
+                {knowledgeGraphs.length > 0 && (
+                  <select
+                    value={selectedGraphId || ''}
+                    onChange={(e) => {
+                      const graphId = parseInt(e.target.value);
+                      setSelectedGraphId(graphId);
+                      const teacherId = getTeacherId();
+                      if (teacherId) {
+                        loadGraphTree(graphId, teacherId);
+                      }
+                    }}
+                    className="w-full mb-4 p-2 border rounded"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 text-2xl">
-                        📁
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditFolderClick(folder);
-                          }}
-                          title={t.teacher.teachingResources.folder.edit}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMoveItem({type: 'folder', id: folder.id});
-                            setMoveModalOpen(true);
-                          }}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteFolder(folder);
-                          }}
-                          title={t.teacher.teachingResources.folder.delete}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <h3 className="font-bold text-slate-900 mb-1 truncate">{folder.folder_name}</h3>
-                    <p className="text-xs text-slate-500 mb-3 line-clamp-2">{folder.description || '-'}</p>
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      <span>{folder.resource_count} {t.teacher.teachingResources.folder.resourceCount}</span>
-                      <span>{folder.subfolder_count} {t.teacher.teachingResources.folder.subfolderCount}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Resources */}
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 mb-4">
-              {viewMode === 'folder' ? t.teacher.teachingResources.title : t.teacher.teachingResources.knowledgeView.title}
-            </h2>
-            {loading ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="mt-4 text-sm text-slate-500">{t.common.loading}</p>
-              </div>
-            ) : (() => {
-              const filteredResources = filterResources(resources);
-              
-              if (filteredResources.length === 0) {
-                return (
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-                    <p className="text-slate-500">{t.teacher.teachingResources.noResources}</p>
-                  </div>
-                );
-              }
-
-              // 知识点模式下按知识点分组显示
-              if (viewMode === 'knowledge') {
-                const grouped = groupResourcesByKnowledgePoint(filteredResources);
-                const knowledgePoints = Object.keys(grouped).sort();
-                
-                return (
-                  <div className="space-y-6">
-                    {knowledgePoints.map((knowledgePoint) => (
-                      <div key={knowledgePoint} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
-                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-lg font-bold">
-                            📚
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-slate-900">{knowledgePoint}</h3>
-                            <p className="text-sm text-slate-500">{grouped[knowledgePoint].length} {t.teacher.teachingResources.knowledgeView.resourcesCount}</p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedKnowledgePoint(selectedKnowledgePoint === knowledgePoint ? null : knowledgePoint);
-                            }}
-                            className="ml-auto px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            {selectedKnowledgePoint === knowledgePoint ? t.teacher.teachingResources.knowledgeView.cancelFilter : t.teacher.teachingResources.knowledgeView.filterOnly}
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                          {grouped[knowledgePoint].map((resource) => renderResourceCard(resource))}
-                        </div>
-                      </div>
+                    {knowledgeGraphs.map(graph => (
+                      <option key={graph.id} value={graph.id}>{graph.graph_name}</option>
                     ))}
-                  </div>
-                );
-              }
+                  </select>
+                )}
+                {loading ? (
+                  <div className="text-center py-4">加载中...</div>
+                ) : graphTree && graphTree.tree && graphTree.tree.length > 0 ? (
+                  graphTree.tree.map((node: KnowledgeNode) => renderGraphTreeNode(node))
+                ) : (
+                  <div className="text-center text-gray-500 py-4">暂无节点</div>
+                )}
+              </div>
+            )}
+          </div>
 
-              // 文件夹模式下正常显示
-              return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredResources.map((resource) => renderResourceCard(resource))}
+          {/* 右侧：资源列表 */}
+          <div className="resource-panel flex-1 bg-white rounded-lg shadow p-4">
+            {/* 固定显示的筛选和排序区域 */}
+            <div className="resource-list-header flex items-center justify-between mb-3 pb-3 border-b">
+              <div className="flex items-center gap-3">
+                <h3 className="text-base font-semibold">
+                  {t.teacher.teachingResources.table.name} 
+                  <span className="text-sm text-gray-500 ml-2">({displayedResources.length})</span>
+                </h3>
+                {/* 类型筛选 */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600">{t.teacher.teachingResources.filter.type}:</span>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="px-3 py-1 text-xs border rounded bg-white hover:border-blue-400 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="all">{t.teacher.teachingResources.types.all}</option>
+                    <option value="pdf">{t.teacher.teachingResources.types.pdf}</option>
+                    <option value="word">{t.teacher.teachingResources.types.word}</option>
+                    <option value="excel">{t.teacher.teachingResources.types.excel}</option>
+                    <option value="ppt">{t.teacher.teachingResources.types.ppt}</option>
+                    <option value="video">{t.teacher.teachingResources.types.video}</option>
+                    <option value="markdown">{t.teacher.teachingResources.types.markdown}</option>
+                    <option value="zip">{t.teacher.teachingResources.types.zip}</option>
+                    <option value="txt">{t.teacher.teachingResources.types.txt}</option>
+                    <option value="question">{t.teacher.teachingResources.types.question}</option>
+                  </select>
                 </div>
-              );
-            })()}
+              </div>
+              <div className="sorting-controls flex gap-2">
+                <span className="text-xs text-gray-600 self-center mr-1">{t.teacher.teachingResources.sort.name}:</span>
+                <button
+                  onClick={() => handleSort('created_at')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    sortBy === 'created_at' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  {t.teacher.teachingResources.sort.time} {sortBy === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </button>
+                <button
+                  onClick={() => handleSort('resource_name')}
+                  className={`px-3 py-1 rounded text-xs ${
+                    sortBy === 'resource_name' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  {t.teacher.teachingResources.sort.name} {sortBy === 'resource_name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </button>
+              </div>
+            </div>
+
+            {/* 表格形式的资源列表 */}
+            {loading ? (
+              <div className="text-center py-8 text-sm">{t.common.loading}</div>
+            ) : displayedResources.length > 0 ? (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.name}</th>
+                        <th className="px-3 py-2 text-left w-16">{t.teacher.teachingResources.table.type}</th>
+                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.folder}</th>
+                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.size}</th>
+                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.knowledgePoint}</th>
+                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.uploadTime}</th>
+                        <th className="px-3 py-2 text-center w-20">{t.teacher.teachingResources.table.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedResources.map((resource) => (
+                        <tr key={resource.id} className="border-b hover:bg-gray-50">
+                          <td className="px-3 py-2">{resource.resource_name}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex justify-center">
+                              {renderTypeLabel(resource.resource_type)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            <span className="text-xs" title={getFolderPath(resource.folder_id ?? null)}>
+                              {getFolderPath(resource.folder_id ?? null)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {(resource.file_size / 1024).toFixed(1)} KB
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            <span className="text-xs" title={getKnowledgePointPath(resource.knowledge_point ?? null)}>
+                              {getKnowledgePointPath(resource.knowledge_point ?? null)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {new Date(resource.created_at).toLocaleString('zh-CN', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            })}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleEditResource(resource)}
+                                className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 inline-flex items-center gap-1"
+                                title={t.common.edit}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleWebOfficePreview(resource)}
+                                className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 inline-flex items-center gap-1"
+                                title={t.teacher.teachingResources.preview}
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* 分页组件 - 始终显示 */}
+                <div className="pagination mt-4 flex items-center justify-between text-xs border-t pt-3">
+                  <div className="text-gray-600">
+                    {t.teacher.teachingResources.pagination.total} {displayedResources.length} {t.teacher.teachingResources.pagination.items}
+                    {totalPages > 1 && (
+                      <span className="ml-2 text-gray-500">
+                        ({t.teacher.teachingResources.pagination.page} {currentPage}/{totalPages})
+                      </span>
+                    )}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-xs"
+                      >
+                        {t.common.previous}
+                      </button>
+                      <span className="text-gray-600 px-2">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-xs"
+                      >
+                        {t.common.next}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-500 py-8 text-sm">
+                {t.teacher.teachingResources.table.selectFolderOrNode}
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-
-      {/* Create Folder Modal */}
-      <Modal isOpen={folderModalOpen} onClose={() => setFolderModalOpen(false)} title={t.teacher.teachingResources.folder.createTitle}>
-        <div className="p-6">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.folder.folderName}
-            </label>
-            <input
-              type="text"
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              placeholder={t.teacher.teachingResources.folder.folderNamePlaceholder}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.folder.description}
-            </label>
-            <textarea
-              value={folderDescription}
-              onChange={(e) => setFolderDescription(e.target.value)}
-              placeholder={t.teacher.teachingResources.folder.descriptionPlaceholder}
-              rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            ></textarea>
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setFolderModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
+        {/* 上传Modal */}
+        <Modal
+          isOpen={uploadModalOpen}
+          onClose={() => {
+            if (!isUploading) {
+              setUploadModalOpen(false);
+              resetUploadForm();
+            }
+          }}
+          title="上传教学资源"
+        >
+          <div className="upload-form space-y-4">
+            {/* 文件选择区域 */}
+            <div
+              className={`upload-area border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
+                isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
             >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleCreateFolder}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              {t.common.create}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Folder Modal */}
-      <Modal isOpen={editFolderModalOpen} onClose={() => setEditFolderModalOpen(false)} title={t.teacher.teachingResources.folder.editTitle}>
-        <div className="p-6">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.folder.folderName}
-            </label>
-            <input
-              type="text"
-              value={editFolderName}
-              onChange={(e) => setEditFolderName(e.target.value)}
-              placeholder={t.teacher.teachingResources.folder.folderNamePlaceholder}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.folder.description}
-            </label>
-            <textarea
-              value={editFolderDescription}
-              onChange={(e) => setEditFolderDescription(e.target.value)}
-              placeholder={t.teacher.teachingResources.folder.descriptionPlaceholder}
-              rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            ></textarea>
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setEditFolderModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleUpdateFolder}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              {t.common.save}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Resource Modal */}
-      <Modal 
-        isOpen={editResourceModalOpen} 
-        onClose={() => {
-          setEditResourceModalOpen(false);
-          setEditingResource(null);
-          setEditResourceName('');
-          setEditKnowledgePoint(null);
-        }} 
-        title={t.teacher.teachingResources.editTitle}
-        size="xl"
-        maxHeight="90vh"
-      >
-        <div className="p-6">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.resourceName} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={editResourceName}
-              onChange={(e) => setEditResourceName(e.target.value)}
-              placeholder="请输入资源名称"
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.knowledgePoint}
-            </label>
-            <KnowledgeGraphTreeSelect
-              teacherId={getTeacherId() || 0}
-              value={editKnowledgePoint || undefined}
-              onChange={(nodeName) => setEditKnowledgePoint(nodeName)}
-              placeholder={t.teacher.teachingResources.knowledgePointPlaceholder}
-            />
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setEditResourceModalOpen(false);
-                setEditingResource(null);
-                setEditResourceName('');
-                setEditKnowledgePoint(null);
-              }}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleUpdateResource}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              {t.common.save}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Upload Resource Modal */}
-      <Modal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} title={t.teacher.teachingResources.uploadTitle}>
-        <div className="p-6">
-          {/* 显示当前文件夹 */}
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="flex items-center gap-2 text-sm">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={isUploading}
+              />
+              <svg className="w-16 h-16 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <span className="text-slate-600 font-medium">上传到：</span>
-              <span className="text-blue-600 font-bold">
-                {currentFolderId ? folderPath[folderPath.length - 1]?.folder_name : t.teacher.teachingResources.folder.rootFolder}
-              </span>
+              <div className="text-gray-600">
+                {uploadFile ? uploadFile.name : '点击或拖拽文件到这里上传'}
+              </div>
+            </div>
+
+            {/* 资源名称 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                资源名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={resourceName}
+                onChange={(e) => setResourceName(e.target.value)}
+                placeholder="输入资源名称"
+                className="w-full p-2 border rounded"
+                disabled={isUploading}
+              />
+            </div>
+
+            {/* 所属文件夹 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                所属文件夹 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={resourceFolderId ?? ''}
+                onChange={(e) => setResourceFolderId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full p-2 border rounded"
+                disabled={isUploading}
+              >
+                <option value="">请选择文件夹</option>
+                {folderTree.map(folder => renderFolderOptions(folder, 0))}
+              </select>
+            </div>
+
+            {/* 知识点 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                知识点 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={knowledgePoint}
+                onChange={(e) => setKnowledgePoint(e.target.value)}
+                className="w-full p-2 border rounded"
+                disabled={isUploading}
+              >
+                <option value="">请选择知识点</option>
+                {graphTree && graphTree.tree && graphTree.tree.map(node => renderKnowledgeOptions(node, 0))}
+              </select>
+            </div>
+
+            {/* 上传进度 */}
+            {isUploading && (
+              <div className="upload-progress">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-600">上传中...</span>
+                  <span className="text-sm font-medium">{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 按钮 */}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setUploadModalOpen(false);
+                  resetUploadForm();
+                }}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                disabled={isUploading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleUploadResource}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
+                disabled={!uploadFile || isUploading}
+              >
+                上传
+              </button>
             </div>
           </div>
-          
-          <div
-            className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 transition-colors mb-4"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setUploadFile(file);
-                  setResourceName(file.name.split('.').slice(0, -1).join('.'));
-                }
-              }}
-              className="hidden"
-            />
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-            </svg>
-            <p className="mt-2 text-sm text-slate-600">
-              {uploadFile ? uploadFile.name : t.teacher.teachingResources.dragDrop}
-            </p>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.resourceName}
-            </label>
-            <input
-              type="text"
-              value={resourceName}
-              onChange={(e) => setResourceName(e.target.value)}
-              placeholder={t.teacher.teachingResources.resourceNamePlaceholder}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {t.teacher.teachingResources.knowledgePoint}
-            </label>
-            <KnowledgeGraphTreeSelect
-              teacherId={getTeacherId() || 0}
-              value={knowledgePoint || undefined}
-              onChange={(nodeName) => setKnowledgePoint(nodeName)}
-              placeholder={t.teacher.teachingResources.knowledgePointPlaceholder}
-            />
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setUploadModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleUploadResource}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              {t.common.upload}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
 
-      {/* Move Modal */}
-      <Modal isOpen={moveModalOpen} onClose={() => setMoveModalOpen(false)} title={t.teacher.teachingResources.folder.moveTo}>
-        <div className="p-6">
-          <p className="text-sm text-slate-600 mb-4">
-            {t.teacher.teachingResources.folder.selectFolder}
-          </p>
-          <select
-            value={targetFolderId || ''}
-            onChange={(e) => setTargetFolderId(e.target.value ? parseInt(e.target.value) : null)}
-            className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-4"
-          >
-            <option value="">{t.teacher.teachingResources.folder.rootFolder}</option>
-            {folders.map((folder) => (
-              <option key={folder.id} value={folder.id}>{folder.folder_name}</option>
-            ))}
-          </select>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setMoveModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleMove}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              {t.teacher.teachingResources.folder.move}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        {/* 编辑资源Modal */}
+        <Modal
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditingResource(null);
+            setResourceName('');
+            setKnowledgePoint('');
+            setResourceFolderId(null);
+          }}
+          title="编辑资源信息"
+        >
+          <div className="edit-form space-y-4">
+            {/* 资源名称 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                资源名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={resourceName}
+                onChange={(e) => setResourceName(e.target.value)}
+                placeholder="输入资源名称"
+                className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+              />
+            </div>
 
-      {/* Resource Preview Modal */}
-      <ResourcePreviewModal
-        isOpen={previewModalOpen}
-        onClose={() => {
-          setPreviewModalOpen(false);
-          setPreviewResource(null);
-        }}
-        resource={previewResource}
-        previewUrl={previewResource ? teachingResourceService.getPreviewUrl(previewResource.id) : ''}
-      />
+            {/* 所属文件夹 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                所属文件夹 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={resourceFolderId ?? ''}
+                onChange={(e) => setResourceFolderId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">请选择文件夹</option>
+                {folderTree.map(folder => renderFolderOptions(folder, 0))}
+              </select>
+            </div>
+
+            {/* 知识点 */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                知识点 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={knowledgePoint}
+                onChange={(e) => setKnowledgePoint(e.target.value)}
+                className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">请选择知识点</option>
+                {graphTree && graphTree.tree && graphTree.tree.map(node => renderKnowledgeOptions(node, 0))}
+              </select>
+            </div>
+
+            {/* 按钮 */}
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditingResource(null);
+                  setResourceName('');
+                  setKnowledgePoint('');
+                  setResourceFolderId(null);
+                }}
+                className="px-4 py-2 border rounded hover:bg-gray-100"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Toast */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </div>
     </TeacherLayout>
   );
 }

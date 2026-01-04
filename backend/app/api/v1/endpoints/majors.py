@@ -1,9 +1,10 @@
 from typing import List, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, and_
+from datetime import datetime
 import pandas as pd
 
 from app.db.session import get_db
@@ -12,6 +13,34 @@ from app.schemas import major as major_schemas
 from app.utils.import_utils import parse_excel_file, generate_excel_template, check_duplicate_major_name
 
 router = APIRouter()
+
+@router.get("/teachers")
+async def search_teachers(
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """搜索教师列表，用于专业负责人下拉菜单"""
+    from sqlalchemy import or_
+    
+    # 构建查询：只查询角色为 teacher 的用户
+    query = select(User).where(User.role == "teacher")
+    
+    # 如果有搜索关键词，添加姓名或手机号搜索
+    if search:
+        query = query.where(
+            or_(
+                User.username.ilike(f"%{search}%"),
+                User.phone.ilike(f"%{search}%")
+            )
+        )
+    
+    # 限制返回结果数量
+    query = query.limit(50)
+    
+    result = await db.execute(query)
+    teachers = result.scalars().all()
+    
+    return [{"id": t.id, "username": t.username, "phone": t.phone} for t in teachers]
 
 @router.get("/stats")
 async def get_majors_stats(
@@ -63,15 +92,40 @@ async def read_majors(
     total = total_result.scalar()
     
     # Execute query with pagination and ordering by updated_at DESC
-    query = select(Major, Organization).join(Organization, Major.organization_id == Organization.id, isouter=True).where(and_(*conditions)).order_by(Major.updated_at.desc().nullslast(), Major.created_at.desc().nullslast()).offset(skip).limit(limit)
+    query = select(Major, Organization, User).join(
+        Organization, Major.organization_id == Organization.id, isouter=True
+    ).join(
+        User, Major.teacher_id == User.id, isouter=True
+    ).where(and_(*conditions)).order_by(
+        Major.updated_at.desc().nullslast(), Major.created_at.desc().nullslast()
+    ).offset(skip).limit(limit)
     result = await db.execute(query)
     rows = result.all()
     
-    # Build response with organization name
+    # Build response with organization name, class count, student count, and teacher name
     items = []
-    for major, org in rows:
+    for major, org, teacher in rows:
         major_dict = major_schemas.Major.from_orm(major).dict()
         major_dict["organization_name"] = org.name if org else None
+        major_dict["teacher_name"] = teacher.username if teacher else None
+        
+        # Get class count for this major
+        class_count_query = select(func.count(Class.id)).where(
+            and_(Class.major_id == major.id, Class.is_active == True)
+        )
+        class_count_result = await db.execute(class_count_query)
+        major_dict["classes_count"] = class_count_result.scalar() or 0
+        
+        # Get student count for this major (through classes)
+        from app.models.base import StudentProfile
+        student_count_query = select(func.count(StudentProfile.id)).join(
+            Class, StudentProfile.class_id == Class.id
+        ).where(
+            and_(Class.major_id == major.id, Class.is_active == True)
+        )
+        student_count_result = await db.execute(student_count_query)
+        major_dict["students_count"] = student_count_result.scalar() or 0
+        
         items.append(major_dict)
     
     return {
@@ -81,17 +135,49 @@ async def read_majors(
         "limit": limit
     }
 
-@router.get("/{major_id}", response_model=major_schemas.Major)
+@router.get("/{major_id}")
 async def get_major(
     major_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """获取专业详情"""
-    result = await db.execute(select(Major).where(and_(Major.id == major_id, Major.is_active == True)))
-    major = result.scalars().first()
-    if not major:
+    result = await db.execute(
+        select(Major, Organization, User).join(
+            Organization, Major.organization_id == Organization.id, isouter=True
+        ).join(
+            User, Major.teacher_id == User.id, isouter=True
+        ).where(and_(Major.id == major_id, Major.is_active == True))
+    )
+    row = result.first()
+    if not row:
         raise HTTPException(status_code=404, detail="Major not found")
-    return major
+    
+    major, org, teacher = row
+    major_dict = major_schemas.Major.from_orm(major).dict()
+    major_dict["organization_name"] = org.name if org else None
+    major_dict["teacher_name"] = teacher.username if teacher else None
+    
+    # Get class count
+    class_count_query = select(func.count(Class.id)).where(
+        and_(Class.major_id == major.id, Class.is_active == True)
+    )
+    class_count_result = await db.execute(class_count_query)
+    major_dict["classes_count"] = class_count_result.scalar() or 0
+    
+    # Get student count
+    from app.models.base import StudentProfile
+    student_count_query = select(func.count(StudentProfile.id)).join(
+        Class, StudentProfile.class_id == Class.id
+    ).where(
+        and_(Class.major_id == major.id, Class.is_active == True)
+    )
+    student_count_result = await db.execute(student_count_query)
+    major_dict["students_count"] = student_count_result.scalar() or 0
+    
+    # Calculate total tuition (tuition_fee * duration_years)
+    major_dict["total_tuition"] = float(major.tuition_fee) * major.duration_years
+    
+    return major_dict
 
 @router.post("/", response_model=major_schemas.Major)
 async def create_major(
@@ -108,10 +194,12 @@ async def create_major(
     
     major = Major(
         name=major_in.name,
+        code=major_in.code,
         description=major_in.description,
         tuition_fee=major_in.tuition_fee,
         duration_years=major_in.duration_years,
-        organization_id=major_in.organization_id
+        organization_id=major_in.organization_id,
+        teacher_id=major_in.teacher_id
     )
     db.add(major)
     await db.commit()
