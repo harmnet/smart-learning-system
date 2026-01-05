@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { teachingResourceService, TeachingResource } from '@/services/teachingResource.service';
 import { resourceFolderService, FolderTreeNode } from '@/services/resourceFolder.service';
 import { knowledgeGraphService, KnowledgeGraph, GraphTree, KnowledgeNode } from '@/services/knowledgeGraph.service';
@@ -11,6 +12,7 @@ import Toast from '@/components/common/Toast';
 
 export default function TeachingResourcesPage() {
   const { t } = useLanguage();
+  const router = useRouter();
   
   // 基础状态
   const [resources, setResources] = useState<TeachingResource[]>([]);
@@ -587,8 +589,10 @@ export default function TeachingResourcesPage() {
     return (
       <div key={node.id} className="folder-node">
         <div
-          className={`folder-item flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-100 rounded ${
-            isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+          className={`folder-item flex items-center gap-2 py-2.5 px-3 cursor-pointer rounded-lg transition-all duration-200 ${
+            isSelected 
+              ? 'bg-gradient-to-r from-[#EFF6FF] to-[#DBEAFE] border-l-4 border-[#2563EB] text-[#2563EB] font-semibold shadow-sm' 
+              : 'hover:bg-[#F8FAFC] text-[#1E293B]'
           }`}
           style={{ paddingLeft: `${level * 12 + 8}px` }}
           onClick={() => handleFolderClick(node.id)}
@@ -599,17 +603,19 @@ export default function TeachingResourcesPage() {
                 e.stopPropagation();
                 toggleFolderExpand(node.id);
               }}
-              className="text-gray-500 hover:text-gray-700"
+              className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[#2563EB]' : 'text-[#94A3B8] hover:text-[#2563EB]'}`}
             >
-              {isExpanded ? '▼' : '▶'}
+              ▶
             </button>
           )}
           {!hasChildren && <span className="w-4" />}
-          <span className="flex-1">{node.folder_name}</span>
-          <span className="text-xs text-gray-500">({node.resource_count})</span>
+          <span className="flex-1 text-sm">{node.folder_name}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${isSelected ? 'bg-[#2563EB] text-white' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+            {node.resource_count}
+          </span>
         </div>
         {isExpanded && hasChildren && (
-          <div className="children">
+          <div className="children mt-1">
             {node.children.map(child => renderFolderTreeNode(child, level + 1))}
           </div>
         )}
@@ -626,8 +632,10 @@ export default function TeachingResourcesPage() {
     return (
       <div key={node.id} className="node-item">
         <div
-          className={`flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-gray-100 rounded ${
-            isSelected ? 'bg-blue-100 border-l-4 border-blue-500' : ''
+          className={`flex items-center gap-2 py-2.5 px-3 cursor-pointer rounded-lg transition-all duration-200 ${
+            isSelected 
+              ? 'bg-gradient-to-r from-[#EFF6FF] to-[#DBEAFE] border-l-4 border-[#2563EB] text-[#2563EB] font-semibold shadow-sm' 
+              : 'hover:bg-[#F8FAFC] text-[#1E293B]'
           }`}
           style={{ paddingLeft: `${level * 12 + 8}px` }}
           onClick={() => handleNodeClick(node.id)}
@@ -638,17 +646,19 @@ export default function TeachingResourcesPage() {
                 e.stopPropagation();
                 toggleNodeExpand(node.id);
               }}
-              className="text-gray-500 hover:text-gray-700"
+              className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''} ${isSelected ? 'text-[#2563EB]' : 'text-[#94A3B8] hover:text-[#2563EB]'}`}
             >
-              {isExpanded ? '▼' : '▶'}
+              ▶
             </button>
           )}
           {!hasChildren && <span className="w-4" />}
-          <span className="flex-1">{node.node_name}</span>
-          <span className="text-xs text-gray-500">({node.total_resource_count || 0})</span>
+          <span className="flex-1 text-sm">{node.node_name}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${isSelected ? 'bg-[#2563EB] text-white' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+            {node.total_resource_count || 0}
+          </span>
         </div>
         {isExpanded && hasChildren && (
-          <div className="children">
+          <div className="children mt-1">
             {node.children?.map((child: KnowledgeNode) => renderGraphTreeNode(child, level + 1))}
           </div>
         )}
@@ -658,61 +668,87 @@ export default function TeachingResourcesPage() {
 
   return (
     <TeacherLayout>
-      <div className="teaching-resources-page p-6">
+      <div className="teaching-resources-page p-6" style={{ fontFamily: "'Open Sans', sans-serif" }}>
         {/* 标题和按钮 */}
         <div className="header mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">{t.teacher.teachingResources.title}</h1>
+            <h1 className="text-2xl font-bold text-[#1E293B]" style={{ fontFamily: "'Poppins', sans-serif" }}>{t.teacher.teachingResources.title}</h1>
             <div className="view-mode-switch flex gap-2">
               <button
                 onClick={() => setViewMode('folder')}
-                className={`px-3 py-1 text-sm rounded flex items-center gap-1 ${viewMode === 'folder' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                className={`px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                  viewMode === 'folder' 
+                    ? 'bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white shadow-lg shadow-[#2563EB]/30' 
+                    : 'bg-[#F8FAFC] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#2563EB] border border-[#E2E8F0]'
+                }`}
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
                 <span>{t.teacher.teachingResources.viewMode.folder}</span>
               </button>
               <button
                 onClick={() => setViewMode('knowledge')}
-                className={`px-3 py-1 text-sm rounded flex items-center gap-1 ${viewMode === 'knowledge' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                className={`px-4 py-2 text-sm rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                  viewMode === 'knowledge' 
+                    ? 'bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white shadow-lg shadow-[#2563EB]/30' 
+                    : 'bg-[#F8FAFC] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#2563EB] border border-[#E2E8F0]'
+                }`}
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
                 </svg>
                 <span>{t.teacher.teachingResources.viewMode.knowledge}</span>
               </button>
             </div>
           </div>
-          <button
-            onClick={() => setUploadModalOpen(true)}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span>{t.teacher.teachingResources.upload}</span>
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/teacher/ai-creation')}
+              className="px-6 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-xl hover:from-[#7C3AED] hover:to-[#6D28D9] hover:-translate-y-0.5 transition-all duration-300 shadow-lg shadow-[#8B5CF6]/30 hover:shadow-xl hover:shadow-[#8B5CF6]/40 flex items-center gap-2"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              <span>AI创作</span>
+            </button>
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="px-6 py-3 bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white rounded-xl hover:from-[#1E40AF] hover:to-[#2563EB] hover:-translate-y-0.5 transition-all duration-300 shadow-lg shadow-[#2563EB]/30 hover:shadow-xl hover:shadow-[#2563EB]/40 flex items-center gap-2"
+              style={{ fontFamily: "'Poppins', sans-serif" }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span>{t.teacher.teachingResources.upload}</span>
+            </button>
+          </div>
         </div>
 
         {/* 主要内容区域 */}
-        <div className="main-content flex gap-4">
+        <div className="main-content flex gap-6">
           {/* 左侧：树形结构 */}
-          <div className="tree-panel w-1/5 bg-white rounded-lg shadow p-3 max-h-[calc(100vh-180px)] overflow-y-auto text-sm">
+          <div className="tree-panel w-1/5 bg-white rounded-xl border border-[#E2E8F0] p-4 max-h-[calc(100vh-180px)] overflow-y-auto text-sm shadow-sm hover:shadow-md transition-shadow duration-300">
             {viewMode === 'folder' ? (
               <div className="folder-tree">
-                <h3 className="text-lg font-semibold mb-4">文件夹结构</h3>
+                <h3 className="text-lg font-bold text-[#1E293B] mb-4 pb-3 border-b border-[#E2E8F0]" style={{ fontFamily: "'Poppins', sans-serif" }}>文件夹结构</h3>
                 {loading ? (
-                  <div className="text-center py-4">加载中...</div>
+                  <div className="text-center py-8 text-[#64748B]">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2563EB]"></div>
+                    <p className="mt-2">加载中...</p>
+                  </div>
                 ) : folderTree.length > 0 ? (
                   folderTree.map(node => renderFolderTreeNode(node))
                 ) : (
-                  <div className="text-center text-gray-500 py-4">暂无文件夹</div>
+                  <div className="text-center text-[#94A3B8] py-8">暂无文件夹</div>
                 )}
               </div>
             ) : (
               <div className="knowledge-tree">
-                <h3 className="text-lg font-semibold mb-4">知识图谱</h3>
+                <h3 className="text-lg font-bold text-[#1E293B] mb-4 pb-3 border-b border-[#E2E8F0]" style={{ fontFamily: "'Poppins', sans-serif" }}>知识图谱</h3>
                 {/* 图谱选择 */}
                 {knowledgeGraphs.length > 0 && (
                   <select
@@ -725,7 +761,7 @@ export default function TeachingResourcesPage() {
                         loadGraphTree(graphId, teacherId);
                       }
                     }}
-                    className="w-full mb-4 p-2 border rounded"
+                    className="w-full mb-4 p-3 border-2 border-[#E2E8F0] rounded-lg focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200 text-[#1E293B] bg-white hover:border-[#CBD5E1]"
                   >
                     {knowledgeGraphs.map(graph => (
                       <option key={graph.id} value={graph.id}>{graph.graph_name}</option>
@@ -733,32 +769,35 @@ export default function TeachingResourcesPage() {
                   </select>
                 )}
                 {loading ? (
-                  <div className="text-center py-4">加载中...</div>
+                  <div className="text-center py-8 text-[#64748B]">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2563EB]"></div>
+                    <p className="mt-2">加载中...</p>
+                  </div>
                 ) : graphTree && graphTree.tree && graphTree.tree.length > 0 ? (
                   graphTree.tree.map((node: KnowledgeNode) => renderGraphTreeNode(node))
                 ) : (
-                  <div className="text-center text-gray-500 py-4">暂无节点</div>
+                  <div className="text-center text-[#94A3B8] py-8">暂无节点</div>
                 )}
               </div>
             )}
           </div>
 
           {/* 右侧：资源列表 */}
-          <div className="resource-panel flex-1 bg-white rounded-lg shadow p-4">
+          <div className="resource-panel flex-1 bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm hover:shadow-md transition-shadow duration-300">
             {/* 固定显示的筛选和排序区域 */}
-            <div className="resource-list-header flex items-center justify-between mb-3 pb-3 border-b">
-              <div className="flex items-center gap-3">
-                <h3 className="text-base font-semibold">
+            <div className="resource-list-header flex items-center justify-between mb-4 pb-4 border-b border-[#E2E8F0]">
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-bold text-[#1E293B]" style={{ fontFamily: "'Poppins', sans-serif" }}>
                   {t.teacher.teachingResources.table.name} 
-                  <span className="text-sm text-gray-500 ml-2">({displayedResources.length})</span>
+                  <span className="text-sm text-[#64748B] font-normal ml-3">({displayedResources.length})</span>
                 </h3>
                 {/* 类型筛选 */}
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600">{t.teacher.teachingResources.filter.type}:</span>
+                  <span className="text-xs text-[#64748B] font-medium">{t.teacher.teachingResources.filter.type}:</span>
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="px-3 py-1 text-xs border rounded bg-white hover:border-blue-400 focus:border-blue-500 focus:outline-none"
+                    className="px-3 py-2 text-xs border-2 border-[#E2E8F0] rounded-lg bg-white hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200"
                   >
                     <option value="all">{t.teacher.teachingResources.types.all}</option>
                     <option value="pdf">{t.teacher.teachingResources.types.pdf}</option>
@@ -773,20 +812,24 @@ export default function TeachingResourcesPage() {
                   </select>
                 </div>
               </div>
-              <div className="sorting-controls flex gap-2">
-                <span className="text-xs text-gray-600 self-center mr-1">{t.teacher.teachingResources.sort.name}:</span>
+              <div className="sorting-controls flex items-center gap-2">
+                <span className="text-xs text-[#64748B] font-medium">{t.teacher.teachingResources.sort.name}:</span>
                 <button
                   onClick={() => handleSort('created_at')}
-                  className={`px-3 py-1 rounded text-xs ${
-                    sortBy === 'created_at' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    sortBy === 'created_at' 
+                      ? 'bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white shadow-lg shadow-[#2563EB]/30' 
+                      : 'bg-[#F8FAFC] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#2563EB] border border-[#E2E8F0]'
                   }`}
                 >
                   {t.teacher.teachingResources.sort.time} {sortBy === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
                 </button>
                 <button
                   onClick={() => handleSort('resource_name')}
-                  className={`px-3 py-1 rounded text-xs ${
-                    sortBy === 'resource_name' ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    sortBy === 'resource_name' 
+                      ? 'bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white shadow-lg shadow-[#2563EB]/30' 
+                      : 'bg-[#F8FAFC] text-[#64748B] hover:bg-[#EFF6FF] hover:text-[#2563EB] border border-[#E2E8F0]'
                   }`}
                 >
                   {t.teacher.teachingResources.sort.name} {sortBy === 'resource_name' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -796,45 +839,48 @@ export default function TeachingResourcesPage() {
 
             {/* 表格形式的资源列表 */}
             {loading ? (
-              <div className="text-center py-8 text-sm">{t.common.loading}</div>
+              <div className="text-center py-16 text-sm text-[#64748B]">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563EB]"></div>
+                <p className="mt-4">{t.common.loading}</p>
+              </div>
             ) : displayedResources.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-[#F8FAFC]">
                       <tr>
-                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.name}</th>
-                        <th className="px-3 py-2 text-left w-16">{t.teacher.teachingResources.table.type}</th>
-                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.folder}</th>
-                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.size}</th>
-                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.knowledgePoint}</th>
-                        <th className="px-3 py-2 text-left">{t.teacher.teachingResources.table.uploadTime}</th>
-                        <th className="px-3 py-2 text-center w-20">{t.teacher.teachingResources.table.actions}</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.name}</th>
+                        <th className="px-4 py-3 text-left w-20 font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.type}</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.folder}</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.size}</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.knowledgePoint}</th>
+                        <th className="px-4 py-3 text-left font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.uploadTime}</th>
+                        <th className="px-4 py-3 text-center w-24 font-semibold text-[#1E293B]">{t.teacher.teachingResources.table.actions}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedResources.map((resource) => (
-                        <tr key={resource.id} className="border-b hover:bg-gray-50">
-                          <td className="px-3 py-2">{resource.resource_name}</td>
-                          <td className="px-3 py-2">
+                        <tr key={resource.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors duration-150">
+                          <td className="px-4 py-3 text-[#1E293B] font-medium">{resource.resource_name}</td>
+                          <td className="px-4 py-3">
                             <div className="flex justify-center">
                               {renderTypeLabel(resource.resource_type)}
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-gray-600">
+                          <td className="px-4 py-3 text-[#64748B]">
                             <span className="text-xs" title={getFolderPath(resource.folder_id ?? null)}>
                               {getFolderPath(resource.folder_id ?? null)}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-600">
+                          <td className="px-4 py-3 text-[#64748B]">
                             {(resource.file_size / 1024).toFixed(1)} KB
                           </td>
-                          <td className="px-3 py-2 text-gray-600">
+                          <td className="px-4 py-3 text-[#64748B]">
                             <span className="text-xs" title={getKnowledgePointPath(resource.knowledge_point ?? null)}>
                               {getKnowledgePointPath(resource.knowledge_point ?? null)}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-600">
+                          <td className="px-4 py-3 text-[#64748B]">
                             {new Date(resource.created_at).toLocaleString('zh-CN', {
                               year: 'numeric',
                               month: '2-digit',
@@ -845,11 +891,11 @@ export default function TeachingResourcesPage() {
                               hour12: false
                             })}
                           </td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={() => handleEditResource(resource)}
-                                className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600 inline-flex items-center gap-1"
+                                className="px-3 py-2 bg-[#10B981] text-white rounded-lg text-xs hover:bg-[#059669] transition-all duration-200 inline-flex items-center gap-1 shadow-sm hover:shadow-md"
                                 title={t.common.edit}
                               >
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -858,7 +904,7 @@ export default function TeachingResourcesPage() {
                               </button>
                               <button
                                 onClick={() => handleWebOfficePreview(resource)}
-                                className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 inline-flex items-center gap-1"
+                                className="px-3 py-2 bg-gradient-to-r from-[#2563EB] to-[#3B82F6] text-white rounded-lg text-xs hover:from-[#1E40AF] hover:to-[#2563EB] transition-all duration-200 inline-flex items-center gap-1 shadow-sm hover:shadow-md"
                                 title={t.teacher.teachingResources.preview}
                               >
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

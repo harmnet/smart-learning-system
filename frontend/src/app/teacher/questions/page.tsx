@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { questionService, Question, QuestionOption } from '@/services/question.service';
+import { teachingResourceService, TeachingResource } from '@/services/teachingResource.service';
 import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
 import Modal from '@/components/common/Modal';
@@ -14,6 +15,11 @@ export default function QuestionBankPage() {
   const [selectedType, setSelectedType] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [knowledgePointFilter, setKnowledgePointFilter] = useState<string | null>(null);
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [total, setTotal] = useState(0);
   
   // Modals
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -28,6 +34,8 @@ export default function QuestionBankPage() {
   // AI出题相关状态
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiAdditionalPrompt, setAiAdditionalPrompt] = useState('');
+  const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
+  const [availableResources, setAvailableResources] = useState<TeachingResource[]>([]);
   
   // Form states
   const [questionType, setQuestionType] = useState<string>('single_choice');
@@ -68,22 +76,49 @@ export default function QuestionBankPage() {
   
   const teacherId = getTeacherId();
 
+  // 筛选条件变化时，重置到第一页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedType, searchTerm, knowledgePointFilter]);
+
   useEffect(() => {
     loadQuestions();
-  }, [selectedType, searchTerm, knowledgePointFilter]);
+  }, [selectedType, searchTerm, knowledgePointFilter, currentPage]);
+
+  // 当知识点改变时，加载该知识点的教学资源
+  useEffect(() => {
+    if (knowledgePoint && teacherId) {
+      loadResourcesForKnowledgePoint(knowledgePoint);
+    } else {
+      setAvailableResources([]);
+      setSelectedResourceId(null);
+    }
+  }, [knowledgePoint]);
+
+  const loadResourcesForKnowledgePoint = async (kp: string) => {
+    try {
+      const resources = await teachingResourceService.getAll(teacherId!, { knowledge_point: kp });
+      setAvailableResources(resources);
+    } catch (error) {
+      console.error('Failed to load resources:', error);
+      setAvailableResources([]);
+    }
+  };
 
   const loadQuestions = async () => {
     setLoading(true);
     try {
+      const skip = (currentPage - 1) * pageSize;
       const data = await questionService.getAll(
         teacherId,
-        0,
-        100,
+        skip,
+        pageSize,
         selectedType || undefined,
         knowledgePointFilter || undefined,
         searchTerm || undefined
       );
-      setQuestions(data);
+      setQuestions(data.questions);
+      setTotal(data.total);
     } catch (error: any) {
       console.error('Failed to load questions:', error);
       const errorMessage = error.response?.data?.detail || error.message || '加载题目失败';
@@ -544,7 +579,8 @@ export default function QuestionBankPage() {
       const result = await questionService.aiGenerateQuestion(
         knowledgePoint,
         questionType,
-        aiAdditionalPrompt
+        aiAdditionalPrompt,
+        selectedResourceId || undefined
       );
 
       if (result.success && result.question) {
@@ -581,7 +617,7 @@ export default function QuestionBankPage() {
   };
 
   const renderQuestionForm = () => (
-    <>
+    <div className={aiGenerating ? 'pointer-events-none opacity-60' : ''}>
       {/* 知识点（必填项） */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
@@ -600,7 +636,8 @@ export default function QuestionBankPage() {
                   const result = await questionService.aiGenerateQuestion(
                     knowledgePoint,
                     questionType,
-                    ''
+                    '',
+                    selectedResourceId || undefined
                   );
                   if (result.success && result.question) {
                     // 填充表单数据
@@ -648,13 +685,43 @@ export default function QuestionBankPage() {
             </button>
           )}
         </div>
-        <KnowledgeGraphTreeSelect
-          teacherId={teacherId}
-          value={knowledgePoint || undefined}
-          onChange={(nodeName) => setKnowledgePoint(nodeName)}
-          placeholder={t.teacher.questionBank.placeholders.knowledgePoint}
-        />
+        <div className={aiGenerating ? 'pointer-events-none opacity-50' : ''}>
+          <KnowledgeGraphTreeSelect
+            teacherId={teacherId}
+            value={knowledgePoint || undefined}
+            onChange={(nodeName) => setKnowledgePoint(nodeName)}
+            placeholder={t.teacher.questionBank.placeholders.knowledgePoint}
+          />
+        </div>
       </div>
+      
+      {/* 教学资源选择（用于快速AI出题） */}
+      {knowledgePoint && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            教学资源（可选，用于AI出题）
+          </label>
+          <select
+            value={selectedResourceId || ''}
+            onChange={(e) => setSelectedResourceId(e.target.value ? Number(e.target.value) : null)}
+            disabled={aiGenerating || availableResources.length === 0}
+            className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
+          >
+            <option value="">不选择资源</option>
+            {availableResources.map((resource) => (
+              <option key={resource.id} value={resource.id}>
+                {resource.resource_name} ({resource.resource_type})
+              </option>
+            ))}
+          </select>
+          {availableResources.length === 0 && (
+            <p className="mt-1 text-xs text-slate-500">该知识点下暂无教学资源</p>
+          )}
+          {availableResources.length > 0 && (
+            <p className="mt-1 text-xs text-slate-500">选择教学资源后，AI将结合资源内容进行出题</p>
+          )}
+        </div>
+      )}
 
       {/* 题型 */}
       <div className="mb-4">
@@ -687,7 +754,8 @@ export default function QuestionBankPage() {
               setOptions([]);
             }
           }}
-          className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          disabled={aiGenerating}
+          className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
         >
           {Object.entries(t.teacher.questionBank.types).map(([key, label]) => {
             if (key === 'all') return null;
@@ -708,7 +776,8 @@ export default function QuestionBankPage() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder={t.teacher.questionBank.placeholders.title}
           rows={3}
-          className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          disabled={aiGenerating}
+          className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
         />
         <div className="mt-2">
           <input
@@ -717,10 +786,12 @@ export default function QuestionBankPage() {
             onChange={handleTitleImageChange}
             accept="image/*"
             className="hidden"
+            disabled={aiGenerating}
           />
           <button
             onClick={() => titleImageInputRef.current?.click()}
-            className="px-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-md hover:bg-blue-50"
+            disabled={aiGenerating}
+            className="px-4 py-2 text-sm text-blue-600 border border-blue-600 rounded-md hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t.teacher.questionBank.titleImage}
           </button>
@@ -884,23 +955,24 @@ export default function QuestionBankPage() {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 
   return (
     <TeacherLayout>
-      <div className="h-full flex flex-col">
+      <div className="h-full flex flex-col" style={{ fontFamily: "'Open Sans', sans-serif" }}>
         {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-100 bg-white">
+        <div className="px-8 py-6 border-b border-[#E2E8F0] bg-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-black text-slate-900 mb-1">{t.teacher.questionBank.title}</h1>
-              <p className="text-sm text-slate-500">{t.teacher.questionBank.subtitle}</p>
+              <h1 className="text-3xl font-bold text-[#1E293B] mb-2" style={{ fontFamily: "'Poppins', sans-serif" }}>{t.teacher.questionBank.title}</h1>
+              <p className="text-sm text-[#64748B]">{t.teacher.questionBank.subtitle}</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleExportQuestions}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-[#10B981] hover:bg-[#059669] shadow-lg shadow-[#10B981]/30 hover:shadow-xl hover:shadow-[#10B981]/40 flex items-center gap-2"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -913,7 +985,8 @@ export default function QuestionBankPage() {
                   setImportResult(null);
                   setImportFile(null);
                 }}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/20 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-[#8B5CF6] hover:bg-[#7C3AED] shadow-lg shadow-[#8B5CF6]/30 hover:shadow-xl hover:shadow-[#8B5CF6]/40 flex items-center gap-2"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
@@ -925,7 +998,8 @@ export default function QuestionBankPage() {
                   resetForm();
                   setCreateModalOpen(true);
                 }}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1E40AF] hover:to-[#2563EB] shadow-lg shadow-[#2563EB]/30 hover:shadow-xl hover:shadow-[#2563EB]/40 flex items-center gap-2"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -937,12 +1011,12 @@ export default function QuestionBankPage() {
         </div>
 
         {/* Filters */}
-        <div className="px-8 py-4 bg-slate-50 border-b border-slate-100">
+        <div className="px-8 py-5 bg-[#F8FAFC] border-b border-[#E2E8F0]">
           <div className="flex gap-4">
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-md text-sm"
+              className="px-4 py-3 border-2 border-[#E2E8F0] rounded-xl text-sm bg-white hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200 text-[#1E293B]"
             >
               <option value="">{t.teacher.questionBank.types.all}</option>
               {Object.entries(t.teacher.questionBank.types).map(([key, label]) => {
@@ -957,7 +1031,7 @@ export default function QuestionBankPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="搜索题干或知识点"
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-md text-sm"
+              className="flex-1 px-4 py-3 border-2 border-[#E2E8F0] rounded-xl text-sm bg-white hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200 text-[#1E293B] placeholder-[#94A3B8]"
             />
             <div className="w-64">
               <KnowledgeGraphTreeSelect
@@ -970,7 +1044,7 @@ export default function QuestionBankPage() {
             {knowledgePointFilter && (
               <button
                 onClick={() => setKnowledgePointFilter(null)}
-                className="px-3 py-2 text-sm text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors"
+                className="px-4 py-3 text-sm text-[#EF4444] bg-[#FEF2F2] rounded-xl hover:bg-[#FEE2E2] transition-all duration-200 border border-[#FCA5A5]"
                 title="清除筛选"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -982,106 +1056,193 @@ export default function QuestionBankPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-8">
+        <div className="flex-1 overflow-y-auto bg-[#F8FAFC] p-8">
           {loading ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-sm text-slate-500">{t.common.loading}</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-16 text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563EB]"></div>
+              <p className="mt-4 text-sm text-[#64748B]">{t.common.loading}</p>
             </div>
           ) : questions.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
               <p className="text-slate-500">{t.teacher.questionBank.noQuestions}</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {questions.map((question) => (
-                <div key={question.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg text-xs font-medium">
-                          {t.teacher.questionBank.types[question.question_type as keyof typeof t.teacher.questionBank.types]}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          难度: {question.difficulty === 1 ? t.teacher.questionBank.difficultyEasy : question.difficulty === 2 ? t.teacher.questionBank.difficultyMedium : t.teacher.questionBank.difficultyHard}
-                        </span>
+            <>
+              <div className="space-y-4">
+                {questions.map((question) => (
+                  <div key={question.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-lg text-xs font-medium">
+                            {t.teacher.questionBank.types[question.question_type as keyof typeof t.teacher.questionBank.types]}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            难度: {question.difficulty === 1 ? t.teacher.questionBank.difficultyEasy : question.difficulty === 2 ? t.teacher.questionBank.difficultyMedium : t.teacher.questionBank.difficultyHard}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 mb-2">{question.title}</h3>
+                        {question.title_image && (
+                          <img src={getImageUrl(question.title_image)} alt="Title" className="max-w-md rounded mb-2" />
+                        )}
+                        {question.knowledge_point && (
+                          <p className="text-sm text-slate-600 mb-2">知识点: {question.knowledge_point}</p>
+                        )}
+                        {question.options && question.options.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {question.options.map((opt) => (
+                              <div key={opt.id} className="text-sm">
+                                <span className={opt.is_correct ? 'text-green-600 font-bold' : 'text-slate-600'}>
+                                  {opt.option_label}. {opt.option_text}
+                                  {opt.is_correct && ' ✓'}
+                                </span>
+                                {opt.option_image && (
+                                  <img src={getImageUrl(opt.option_image)} alt={`Option ${opt.option_label}`} className="mt-1 max-w-xs rounded" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {question.answer && (
+                          <div className="mt-2">
+                            <p className="text-sm text-green-600 font-medium">答案: {question.answer}</p>
+                            {question.answer_image && (
+                              <img src={getImageUrl(question.answer_image)} alt="Answer" className="mt-1 max-w-md rounded" />
+                            )}
+                          </div>
+                        )}
+                        {question.explanation && (
+                          <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                            <p className="text-sm font-medium text-slate-700 mb-1">解析:</p>
+                            <p className="text-sm text-slate-600">{question.explanation}</p>
+                            {question.explanation_image && (
+                              <img src={getImageUrl(question.explanation_image)} alt="Explanation" className="mt-2 max-w-md rounded" />
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <h3 className="text-lg font-bold text-slate-900 mb-2">{question.title}</h3>
-                      {question.title_image && (
-                        <img src={getImageUrl(question.title_image)} alt="Title" className="max-w-md rounded mb-2" />
-                      )}
-                      {question.knowledge_point && (
-                        <p className="text-sm text-slate-600 mb-2">知识点: {question.knowledge_point}</p>
-                      )}
-                      {question.options && question.options.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {question.options.map((opt) => (
-                            <div key={opt.id} className="text-sm">
-                              <span className={opt.is_correct ? 'text-green-600 font-bold' : 'text-slate-600'}>
-                                {opt.option_label}. {opt.option_text}
-                                {opt.is_correct && ' ✓'}
-                              </span>
-                              {opt.option_image && (
-                                <img src={getImageUrl(opt.option_image)} alt={`Option ${opt.option_label}`} className="mt-1 max-w-xs rounded" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {question.answer && (
-                        <div className="mt-2">
-                          <p className="text-sm text-green-600 font-medium">答案: {question.answer}</p>
-                          {question.answer_image && (
-                            <img src={getImageUrl(question.answer_image)} alt="Answer" className="mt-1 max-w-md rounded" />
-                          )}
-                        </div>
-                      )}
-                      {question.explanation && (
-                        <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                          <p className="text-sm font-medium text-slate-700 mb-1">解析:</p>
-                          <p className="text-sm text-slate-600">{question.explanation}</p>
-                          {question.explanation_image && (
-                            <img src={getImageUrl(question.explanation_image)} alt="Explanation" className="mt-2 max-w-md rounded" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <button
-                        onClick={() => handleEditQuestion(question)}
-                        className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
-                      >
-                        {t.common.edit}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteQuestion(question)}
-                        className="px-4 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
-                      >
-                        {t.common.delete}
-                      </button>
+                      <div className="flex gap-2 ml-4">
+                        <button
+                          onClick={() => handleEditQuestion(question)}
+                          className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
+                        >
+                          {t.common.edit}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteQuestion(question)}
+                          className="px-4 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
+                        >
+                          {t.common.delete}
+                        </button>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+              
+              {/* 分页组件 */}
+              {total > pageSize && (
+                <div className="mt-6 flex items-center justify-between bg-white px-6 py-4 rounded-lg border border-slate-200">
+                  <div className="text-sm text-slate-600">
+                    显示 {Math.min((currentPage - 1) * pageSize + 1, total)} - {Math.min(currentPage * pageSize, total)} 条，共 {total} 条
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (currentPage > 1) {
+                          setCurrentPage(currentPage - 1);
+                        }
+                      }}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      上一页
+                    </button>
+                    
+                    {/* 页码按钮 */}
+                    {Array.from({ length: Math.ceil(total / pageSize) }, (_, i) => i + 1)
+                      .filter((page) => {
+                        // 只显示当前页附近的页码
+                        if (Math.ceil(total / pageSize) <= 7) return true;
+                        if (page === 1 || page === Math.ceil(total / pageSize)) return true;
+                        if (Math.abs(page - currentPage) <= 1) return true;
+                        return false;
+                      })
+                      .map((page, index, array) => {
+                        // 添加省略号
+                        if (index > 0 && page - array[index - 1] > 1) {
+                          return [
+                            <span key={`ellipsis-${page}`} className="px-2 text-slate-400">...</span>,
+                            <button
+                              key={page}
+                              onClick={() => setCurrentPage(page)}
+                              className={`px-3 py-2 text-sm font-medium rounded-md ${
+                                currentPage === page
+                                  ? 'bg-blue-600 text-white'
+                                  : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          ];
+                        }
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-2 text-sm font-medium rounded-md ${
+                              currentPage === page
+                                ? 'bg-blue-600 text-white'
+                                : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    
+                    <button
+                      onClick={() => {
+                        if (currentPage < Math.ceil(total / pageSize)) {
+                          setCurrentPage(currentPage + 1);
+                        }
+                      }}
+                      disabled={currentPage >= Math.ceil(total / pageSize)}
+                      className="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      下一页
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* Create Modal */}
-      <Modal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} title={t.teacher.questionBank.createTitle} size="xl">
+      <Modal isOpen={createModalOpen} onClose={() => !aiGenerating && setCreateModalOpen(false)} title={t.teacher.questionBank.createTitle} size="xl">
         <div className="p-6">
           {renderQuestionForm()}
+          {/* AI生成状态提示 */}
+          {aiGenerating && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
+              <p className="text-sm text-slate-600">AI正在生成题目，请稍候...</p>
+            </div>
+          )}
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={() => setCreateModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200"
+              disabled={aiGenerating}
+              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t.common.cancel}
             </button>
             <button
               onClick={handleCreateQuestion}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              disabled={aiGenerating}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t.common.create}
             </button>
@@ -1113,12 +1274,14 @@ export default function QuestionBankPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">
               知识点 <span className="text-red-500">*</span>
             </label>
-            <KnowledgeGraphTreeSelect
-              teacherId={teacherId}
-              value={knowledgePoint || undefined}
-              onChange={(nodeName) => setKnowledgePoint(nodeName)}
-              placeholder="请选择知识点"
-            />
+            <div className={aiGenerating ? 'pointer-events-none opacity-50' : ''}>
+              <KnowledgeGraphTreeSelect
+                teacherId={teacherId}
+                value={knowledgePoint || undefined}
+                onChange={(nodeName) => setKnowledgePoint(nodeName)}
+                placeholder="请选择知识点"
+              />
+            </div>
           </div>
 
           {/* 题型选择 */}
@@ -1145,137 +1308,10 @@ export default function QuestionBankPage() {
                   ]);
                 } else {
                   setOptions([]);
-                }
-              }}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              {Object.entries(t.teacher.questionBank.types).map(([key, label]) => {
-                if (key === 'all') return null;
-                return (
-                  <option key={key} value={key}>{label}</option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* 补充提示词 */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              补充提示词（可选）
-            </label>
-            <textarea
-              value={aiAdditionalPrompt}
-              onChange={(e) => setAiAdditionalPrompt(e.target.value)}
-              placeholder="例如：题目难度适中，考察基础概念，选项要具有迷惑性..."
-              rows={4}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-            <p className="mt-1 text-xs text-slate-500">可以补充对题目的具体要求，帮助AI生成更符合需求的题目</p>
-          </div>
-
-          {/* 加载状态 */}
-          {aiGenerating && (
-            <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-2"></div>
-              <p className="text-sm text-slate-600">AI正在生成题目，请稍候...</p>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={() => {
-                if (!aiGenerating) {
-                  setAiGenerateModalOpen(false);
-                  setAiAdditionalPrompt('');
                 }
               }}
               disabled={aiGenerating}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              onClick={handleAIGenerateQuestion}
-              disabled={aiGenerating || !knowledgePoint || !questionType}
-              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-md hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {aiGenerating ? (
-                <>
-                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  生成中...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                  </svg>
-                  出题
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* AI出题 Modal */}
-      <Modal isOpen={aiGenerateModalOpen} onClose={() => !aiGenerating && setAiGenerateModalOpen(false)} title="AI出题" size="lg">
-        <div className="p-6">
-          {/* 显示知识点和题型信息 */}
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="space-y-2">
-              <div>
-                <span className="text-sm font-medium text-slate-700">知识点：</span>
-                <span className="text-sm text-slate-900 ml-2">{knowledgePoint || '未选择'}</span>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-700">题型：</span>
-                <span className="text-sm text-slate-900 ml-2">
-                  {questionType ? t.teacher.questionBank.types[questionType as keyof typeof t.teacher.questionBank.types] : '未选择'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 知识点选择 */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              知识点 <span className="text-red-500">*</span>
-            </label>
-            <KnowledgeGraphTreeSelect
-              teacherId={teacherId}
-              value={knowledgePoint || undefined}
-              onChange={(nodeName) => setKnowledgePoint(nodeName)}
-              placeholder="请选择知识点"
-            />
-          </div>
-
-          {/* 题型选择 */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              题型 <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={questionType}
-              onChange={(e) => {
-                setQuestionType(e.target.value);
-                // 根据题型自动设置选项
-                if (e.target.value === 'single_choice' || e.target.value === 'multiple_choice') {
-                  setOptions([
-                    { option_label: 'A', option_text: '', is_correct: false, sort_order: 0 },
-                    { option_label: 'B', option_text: '', is_correct: false, sort_order: 1 },
-                    { option_label: 'C', option_text: '', is_correct: false, sort_order: 2 },
-                    { option_label: 'D', option_text: '', is_correct: false, sort_order: 3 },
-                  ]);
-                } else if (e.target.value === 'true_false') {
-                  setOptions([
-                    { option_label: 'A', option_text: t.teacher.questionBank.trueFalse.true, is_correct: false, sort_order: 0 },
-                    { option_label: 'B', option_text: t.teacher.questionBank.trueFalse.false, is_correct: false, sort_order: 1 },
-                  ]);
-                } else {
-                  setOptions([]);
-                }
-              }}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
             >
               {Object.entries(t.teacher.questionBank.types).map(([key, label]) => {
                 if (key === 'all') return null;
@@ -1284,6 +1320,35 @@ export default function QuestionBankPage() {
                 );
               })}
             </select>
+          </div>
+
+          {/* 教学资源选择 */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              教学资源（可选）
+            </label>
+            <select
+              value={selectedResourceId || ''}
+              onChange={(e) => setSelectedResourceId(e.target.value ? Number(e.target.value) : null)}
+              disabled={aiGenerating || !knowledgePoint || availableResources.length === 0}
+              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
+            >
+              <option value="">不选择资源</option>
+              {availableResources.map((resource) => (
+                <option key={resource.id} value={resource.id}>
+                  {resource.resource_name} ({resource.resource_type})
+                </option>
+              ))}
+            </select>
+            {!knowledgePoint && (
+              <p className="mt-1 text-xs text-amber-600">请先选择知识点，才能选择教学资源</p>
+            )}
+            {knowledgePoint && availableResources.length === 0 && (
+              <p className="mt-1 text-xs text-slate-500">该知识点下暂无教学资源</p>
+            )}
+            {knowledgePoint && availableResources.length > 0 && (
+              <p className="mt-1 text-xs text-slate-500">选择教学资源后，AI将结合资源内容进行出题</p>
+            )}
           </div>
 
           {/* 补充提示词 */}
@@ -1296,7 +1361,8 @@ export default function QuestionBankPage() {
               onChange={(e) => setAiAdditionalPrompt(e.target.value)}
               placeholder="例如：题目难度适中，考察基础概念，选项要具有迷惑性..."
               rows={4}
-              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              disabled={aiGenerating}
+              className="w-full px-4 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50"
             />
             <p className="mt-1 text-xs text-slate-500">可以补充对题目的具体要求，帮助AI生成更符合需求的题目</p>
           </div>

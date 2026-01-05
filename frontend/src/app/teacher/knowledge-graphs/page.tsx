@@ -804,13 +804,13 @@ export default function KnowledgeGraphPage() {
 
   return (
     <TeacherLayout>
-      <div className="h-full flex flex-col">
+      <div className="h-full flex flex-col" style={{ fontFamily: "'Open Sans', sans-serif" }}>
         {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-100 bg-white">
+        <div className="px-8 py-6 border-b border-[#E2E8F0] bg-white">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-black text-slate-900 mb-1">{t.teacher.knowledgeGraph.title}</h1>
-              <p className="text-sm text-slate-500">{t.teacher.knowledgeGraph.subtitle}</p>
+              <h1 className="text-3xl font-bold text-[#1E293B] mb-2" style={{ fontFamily: "'Poppins', sans-serif" }}>{t.teacher.knowledgeGraph.title}</h1>
+              <p className="text-sm text-[#64748B]">{t.teacher.knowledgeGraph.subtitle}</p>
             </div>
             <div className="flex gap-3">
               <button
@@ -818,7 +818,8 @@ export default function KnowledgeGraphPage() {
                   resetGraphForm();
                   setAiGenerateModalOpen(true);
                 }}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/20 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-[#8B5CF6] hover:bg-[#7C3AED] shadow-lg shadow-[#8B5CF6]/30 hover:shadow-xl hover:shadow-[#8B5CF6]/40 flex items-center gap-2"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -830,7 +831,8 @@ export default function KnowledgeGraphPage() {
                   resetGraphForm();
                   setCreateGraphModalOpen(true);
                 }}
-                className="px-6 py-3 text-sm font-bold rounded-full transition-colors active:scale-95 text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1E40AF] hover:to-[#2563EB] shadow-lg shadow-[#2563EB]/30 hover:shadow-xl hover:shadow-[#2563EB]/40 flex items-center gap-2"
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -842,28 +844,28 @@ export default function KnowledgeGraphPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-8">
+        <div className="flex-1 overflow-y-auto bg-[#F8FAFC] p-8">
           {loading ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-sm text-slate-500">{t.common.loading}</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-16 text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563EB]"></div>
+              <p className="mt-4 text-sm text-[#64748B]">{t.common.loading}</p>
             </div>
           ) : graphs.length === 0 ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
-              <p className="text-slate-500">{t.teacher.knowledgeGraph.noGraphs}</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-16 text-center">
+              <p className="text-[#64748B]">{t.teacher.knowledgeGraph.noGraphs}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {graphs.map((graph) => (
-                <div key={graph.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xl font-bold">
+                <div key={graph.id} className="bg-white rounded-xl p-6 shadow-sm border border-[#E2E8F0] hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg" style={{ fontFamily: "'Poppins', sans-serif" }}>
                       {graph.graph_name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex gap-1">
                       <button
                         onClick={() => handleViewGraph(graph)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        className="p-2 text-[#2563EB] hover:bg-[#EFF6FF] rounded-lg transition-all duration-200"
                         title={t.teacher.knowledgeGraph.viewGraph}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -873,7 +875,7 @@ export default function KnowledgeGraphPage() {
                       </button>
                       <button
                         onClick={() => handleEditGraph(graph)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                        className="p-2 text-[#10B981] hover:bg-[#D1FAE5] rounded-lg transition-all duration-200"
                         title={t.teacher.knowledgeGraph.editGraph}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -882,7 +884,7 @@ export default function KnowledgeGraphPage() {
                       </button>
                       <button
                         onClick={() => handleDeleteGraph(graph)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                        className="p-2 text-[#EF4444] hover:bg-[#FEE2E2] rounded-lg transition-all duration-200"
                         title={t.teacher.knowledgeGraph.deleteGraph}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -891,15 +893,15 @@ export default function KnowledgeGraphPage() {
                       </button>
                     </div>
                   </div>
-                  <h3 className="font-bold text-slate-900 mb-1">{graph.graph_name}</h3>
+                  <h3 className="font-bold text-[#1E293B] mb-2 text-lg" style={{ fontFamily: "'Poppins', sans-serif" }}>{graph.graph_name}</h3>
                   {graph.description && (
-                    <p className="text-xs text-slate-500 mb-2 line-clamp-2">{graph.description}</p>
+                    <p className="text-sm text-[#64748B] mb-3 line-clamp-2">{graph.description}</p>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 text-sm text-[#64748B] bg-[#F8FAFC] rounded-lg px-3 py-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
-                    {graph.node_count} {t.teacher.knowledgeGraph.nodeCount}
+                    <span className="font-semibold text-[#2563EB]">{graph.node_count}</span> {t.teacher.knowledgeGraph.nodeCount}
                   </div>
                 </div>
               ))}

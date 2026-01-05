@@ -30,6 +30,8 @@ ENV/
 # IDE
 .vscode/
 .idea/
+.cursor/
+.shared/
 *.swp
 *.swo
 *~

@@ -59,7 +59,7 @@ class QuestionService {
   }
 
   /**
-   * 获取题目列表
+   * 获取题目列表（支持分页）
    */
   async getAll(
     teacherId: number,
@@ -68,13 +68,13 @@ class QuestionService {
     questionType?: string,
     knowledgePoint?: string,
     search?: string
-  ): Promise<Question[]> {
+  ): Promise<{ questions: Question[]; total: number }> {
     const params: any = { teacher_id: teacherId, skip, limit };
     if (questionType) params.question_type = questionType;
     if (knowledgePoint) params.knowledge_point = knowledgePoint;
     if (search) params.search = search;
     
-    const response = await apiClient.get<Question[]>('/teacher/questions/', { params });
+    const response = await apiClient.get<{ questions: Question[]; total: number }>('/teacher/questions/', { params });
     return response.data;
   }
 
@@ -250,12 +250,14 @@ class QuestionService {
   async aiGenerateQuestion(
     knowledgePoint: string,
     questionType: string,
-    additionalPrompt?: string
+    additionalPrompt?: string,
+    resourceId?: number
   ): Promise<{ success: boolean; question?: any; error?: string }> {
     const response = await apiClient.post('/teacher/questions/ai-generate', {
       knowledge_point: knowledgePoint,
       question_type: questionType,
       additional_prompt: additionalPrompt || '',
+      resource_id: resourceId || null,
     });
     return response.data;
   }

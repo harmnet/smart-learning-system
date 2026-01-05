@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     OSS_ENDPOINT: str = ""  # 可选：自定义域名，例如 https://static.example.com
     OSS_USE_CNAME: bool = False  # 是否使用自定义域名
 
+    # Banana-Slides PPT服务配置
+    BANANA_SLIDES_API_URL: str = "http://localhost:5002"
+    BANANA_SLIDES_FRONTEND_URL: str = "http://localhost:3002"
+    GEMINI_API_KEY: str = ""
+
     class Config:
         case_sensitive = True
         env_file = ".env"

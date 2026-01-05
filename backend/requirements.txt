@@ -19,4 +19,7 @@ oss2>=2.18.4
 greenlet>=3.0.0
 PyPDF2>=3.0.0
 pdfplumber>=0.10.0
+python-docx>=0.8.11
+markdown>=3.4.0
+beautifulsoup4>=4.12.0
 

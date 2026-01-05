@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, students, teachers, course_outline, llm_configs, student_learning
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -22,4 +22,6 @@ api_router.include_router(teachers.router, prefix="/teacher", tags=["teachers"])
 api_router.include_router(course_outline.router, prefix="/teacher", tags=["course-outline"])
 api_router.include_router(llm_configs.router, prefix="/admin/llm-configs", tags=["llm-configs"])
 api_router.include_router(student_learning.router, prefix="/student/learning", tags=["student-learning"])
+api_router.include_router(ai_creation.router, prefix="/teacher/ai-creation", tags=["ai-creation"])
+api_router.include_router(ppt_creation.router, prefix="/teacher/ppt-creation", tags=["ppt-creation"])
 

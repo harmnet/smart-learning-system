@@ -17,6 +17,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - smart-learning-network
 
   redis:
     image: redis:7-alpine
@@ -28,7 +30,34 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - smart-learning-network
+
+  banana-slides:
+    image: anionex/banana-slides:latest
+    container_name: smart-learning-ppt-service
+    ports:
+      - "5002:5000"  # Flask后端
+      - "3002:3000"  # React前端
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///instance/banana.db
+    volumes:
+      - ppt_data:/app/backend/instance
+      - ppt_exports:/app/backend/exports
+      - ppt_uploads:/app/backend/uploads
+    networks:
+      - smart-learning-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  ppt_data:
+  ppt_exports:
+  ppt_uploads:
+
+networks:
+  smart-learning-network:
+    driver: bridge
 

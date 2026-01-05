@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models.base import User
 from app.models.question import Question, QuestionOption
 from app.models.llm_config import LLMConfig
+from app.models.teaching_resource import TeachingResource
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,9 +95,10 @@ async def get_questions(
     knowledge_point: Optional[str] = None,
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-) -> List[Any]:
-    """获取题目列表"""
-    query = select(Question).where(
+) -> Any:
+    """获取题目列表（支持分页）"""
+    # 构建基础查询
+    base_query = select(Question).where(
         and_(
             Question.teacher_id == teacher_id,
             Question.is_active == True
@@ -104,21 +106,26 @@ async def get_questions(
     )
     
     if question_type:
-        query = query.where(Question.question_type == question_type)
+        base_query = base_query.where(Question.question_type == question_type)
     
     if knowledge_point:
-        query = query.where(Question.knowledge_point.ilike(f"%{knowledge_point}%"))
+        base_query = base_query.where(Question.knowledge_point.ilike(f"%{knowledge_point}%"))
     
     if search:
-        query = query.where(
+        base_query = base_query.where(
             or_(
                 Question.title.ilike(f"%{search}%"),
                 Question.knowledge_point.ilike(f"%{search}%")
             )
         )
     
-    query = query.offset(skip).limit(limit).order_by(Question.created_at.desc())
+    # 获取总数
+    count_query = select(func.count()).select_from(base_query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
     
+    # 获取分页数据
+    query = base_query.offset(skip).limit(limit).order_by(Question.created_at.desc())
     result = await db.execute(query)
     questions = result.scalars().all()
     
@@ -161,7 +168,10 @@ async def get_questions(
             ]
         })
     
-    return question_list
+    return {
+        "questions": question_list,
+        "total": total
+    }
 
 @router.post("/")
 async def create_question(
@@ -742,6 +752,7 @@ class AIGenerateQuestionRequest(BaseModel):
     knowledge_point: str
     question_type: str
     additional_prompt: Optional[str] = ""
+    resource_id: Optional[int] = None
 
 class AIGenerateQuestionResponse(BaseModel):
     success: bool
@@ -774,16 +785,71 @@ async def ai_generate_question(
             error="LLM配置的API Key未设置"
         )
     
+    # 读取教学资源内容（如果提供了resource_id）
+    resource_content = ""
+    if request.resource_id:
+        try:
+            result = await db.execute(
+                select(TeachingResource).where(TeachingResource.id == request.resource_id)
+            )
+            resource = result.scalars().first()
+            
+            if resource:
+                # 从OSS读取文件内容
+                try:
+                    from app.utils.oss_client import get_oss_client
+                    oss_client = get_oss_client()
+                    
+                    # 下载文件内容
+                    file_content = oss_client.bucket.get_object(resource.file_path)
+                    content_bytes = file_content.read()
+                    
+                    # 根据文件类型解析内容
+                    if resource.resource_type in ['pdf', 'word', 'txt', 'markdown']:
+                        # 尝试解码为文本
+                        try:
+                            resource_content = content_bytes.decode('utf-8')
+                        except UnicodeDecodeError:
+                            try:
+                                resource_content = content_bytes.decode('gbk')
+                            except:
+                                resource_content = f"[文件内容无法解析，文件类型: {resource.resource_type}]"
+                    elif resource.resource_type == 'excel':
+                        # 使用pandas读取Excel
+                        try:
+                            df = pd.read_excel(io.BytesIO(content_bytes))
+                            resource_content = df.to_string()
+                        except:
+                            resource_content = "[Excel文件内容无法解析]"
+                    else:
+                        resource_content = f"[不支持的文件类型: {resource.resource_type}]"
+                    
+                    # 检查内容长度，限制在60k字符
+                    if len(resource_content) > 60000:
+                        return AIGenerateQuestionResponse(
+                            success=False,
+                            error="教学资源文件太大，无法AI出题"
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to read resource content: {str(e)}")
+                    resource_content = f"[资源内容读取失败: {str(e)}]"
+        except Exception as e:
+            logger.error(f"Failed to fetch resource: {str(e)}")
+    
     # 构建提示词
     question_type_name = QUESTION_TYPES.get(request.question_type, request.question_type)
     
     # 根据题型构建不同的提示词模板
     if request.question_type in ["single_choice", "multiple_choice", "true_false"]:
+        resource_section = ""
+        if resource_content:
+            resource_section = f"\n\n教学资源内容：\n{resource_content}\n\n请结合以上教学资源内容出题。"
+        
         prompt_template = f"""请根据以下要求生成一道{question_type_name}：
 
 知识点：{request.knowledge_point}
 题型：{question_type_name}
-补充要求：{request.additional_prompt if request.additional_prompt else "无特殊要求"}
+补充要求：{request.additional_prompt if request.additional_prompt else "无特殊要求"}{resource_section}
 
 请严格按照以下JSON格式输出，不要包含任何其他文字说明：
 
@@ -806,11 +872,15 @@ async def ai_generate_question(
 4. 必须输出有效的JSON格式，不要包含markdown代码块标记
 5. 题干应该清晰、准确，符合{request.knowledge_point}的知识点要求"""
     else:
+        resource_section = ""
+        if resource_content:
+            resource_section = f"\n\n教学资源内容：\n{resource_content}\n\n请结合以上教学资源内容出题。"
+        
         prompt_template = f"""请根据以下要求生成一道{question_type_name}：
 
 知识点：{request.knowledge_point}
 题型：{question_type_name}
-补充要求：{request.additional_prompt if request.additional_prompt else "无特殊要求"}
+补充要求：{request.additional_prompt if request.additional_prompt else "无特殊要求"}{resource_section}
 
 请严格按照以下JSON格式输出，不要包含任何其他文字说明：
 
@@ -914,7 +984,11 @@ async def ai_generate_question(
 async def call_openai_compatible(config: LLMConfig, prompt: str) -> str:
     """调用OpenAI兼容的API"""
     endpoint = config.endpoint_url.rstrip('/') if config.endpoint_url else ""
-    url = f"{endpoint}/chat/completions"
+    # 如果endpoint已经包含/chat/completions，就不需要再拼接
+    if endpoint.endswith('/chat/completions'):
+        url = endpoint
+    else:
+        url = f"{endpoint}/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {config.api_key}",

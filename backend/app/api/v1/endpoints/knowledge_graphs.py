@@ -712,7 +712,11 @@ async def ai_generate_graph_from_pdf(
 async def _call_openai_compatible(config: LLMConfig, prompt: str) -> str:
     """调用OpenAI兼容的API"""
     endpoint = config.endpoint_url.rstrip('/') if config.endpoint_url else ""
-    url = f"{endpoint}/chat/completions"
+    # 如果endpoint已经包含/chat/completions，就不需要再拼接
+    if endpoint.endswith('/chat/completions'):
+        url = endpoint
+    else:
+        url = f"{endpoint}/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {config.api_key}",
