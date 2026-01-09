@@ -133,13 +133,16 @@ class Course(Base):
     code = Column(String, unique=True)
     description = Column(Text)
     cover_image = Column(String)  # 保留字段，用于兼容
-    credits = Column(Integer, default=2)
-    course_type = Column(String(20))  # 课程类型：required（必修课）、elective（选修课）
+    credits = Column(Integer, default=2)  # 课程学分
+    course_type = Column(String(20))  # 保留字段，用于兼容（必修课/选修课）
+    course_category = Column(String(50))  # 课程类型：general（通识课）、professional_basic（专业基础课）、professional_core（专业核心课）、expansion（拓展课）、elective_course（选修课）
+    enrollment_type = Column(String(20))  # 选课类型：required（必修课）、elective（选修课）、retake（重修课）
     hours = Column(Integer)  # 课程学时
     introduction = Column(Text)  # 课程简介
     objectives = Column(Text)  # 授课目标
     main_teacher_id = Column(Integer, ForeignKey("sys_user.id"))  # 主讲教师ID
     is_public = Column(Boolean, default=False)  # 是否公开课
+    is_deleted = Column(Boolean, default=False)  # 逻辑删除标记
     major_id = Column(Integer, ForeignKey("major.id"), nullable=True)  # 所属专业ID
     
     # Relationships
@@ -195,7 +198,8 @@ class CourseChapter(Base):
     resources = relationship("CourseResource", back_populates="chapter")
     # 课程大纲相关关系（延迟导入避免循环依赖）
     section_resources = relationship("CourseSectionResource", foreign_keys="[CourseSectionResource.chapter_id]", cascade="all, delete-orphan", lazy="selectin")
-    exam_paper_links = relationship("CourseChapterExamPaper", foreign_keys="[CourseChapterExamPaper.chapter_id]", cascade="all, delete-orphan", lazy="selectin")
+    exam_paper_links = relationship("CourseChapterExamPaper", foreign_keys="[CourseChapterExamPaper.chapter_id]", cascade="all, delete-orphan", lazy="selectin")  # 已废弃，保留用于数据备份
+    exam_links = relationship("CourseChapterExam", foreign_keys="[CourseChapterExam.chapter_id]", cascade="all, delete-orphan", lazy="selectin")  # 新：章节-考试关联
     homework_items = relationship("CourseSectionHomework", foreign_keys="[CourseSectionHomework.chapter_id]", cascade="all, delete-orphan", lazy="selectin")
 
 class CourseResource(Base):

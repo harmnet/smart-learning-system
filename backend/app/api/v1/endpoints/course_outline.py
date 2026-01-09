@@ -9,11 +9,12 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db.session import get_db
-from app.models.course_outline import CourseSectionResource, CourseChapterExamPaper, CourseSectionHomework
+from app.models.course_outline import CourseSectionResource, CourseChapterExamPaper, CourseSectionHomework, CourseChapterExam
 from app.models.base import Course, CourseChapter
 from app.models.teaching_resource import TeachingResource
 from app.models.reference_material import ReferenceMaterial
 from app.models.exam_paper import ExamPaper
+from app.models.exam import Exam
 from app.core import security
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -150,16 +151,17 @@ async def get_course_outline(
             resources_by_chapter[res.chapter_id] = []
         resources_by_chapter[res.chapter_id].append(res)
     
-    # 加载试卷关联
-    exam_papers_result = await db.execute(
-        select(CourseChapterExamPaper).where(CourseChapterExamPaper.chapter_id.in_(chapter_ids))
+    # 加载考试关联（新逻辑：章节 → 考试）
+    exams_result = await db.execute(
+        select(CourseChapterExam).options(selectinload(CourseChapterExam.exam))
+        .where(CourseChapterExam.chapter_id.in_(chapter_ids))
     )
-    all_exam_papers = exam_papers_result.scalars().all()
-    exam_papers_by_chapter = {}
-    for ep in all_exam_papers:
-        if ep.chapter_id not in exam_papers_by_chapter:
-            exam_papers_by_chapter[ep.chapter_id] = []
-        exam_papers_by_chapter[ep.chapter_id].append(ep)
+    all_exams = exams_result.scalars().all()
+    exams_by_chapter = {}
+    for exam_link in all_exams:
+        if exam_link.chapter_id not in exams_by_chapter:
+            exams_by_chapter[exam_link.chapter_id] = []
+        exams_by_chapter[exam_link.chapter_id].append(exam_link)
     
     # 加载作业
     homeworks_result = await db.execute(
@@ -187,22 +189,44 @@ async def get_course_outline(
     outline = []
     for chapter in chapters:
         logging.info(f"处理章: id={chapter.id}, title={chapter.title}")
+        # 构建章节的考试列表
+        chapter_exams = []
+        for exam_link in exams_by_chapter.get(chapter.id, []):
+            if exam_link.exam:
+                chapter_exams.append({
+                    "id": exam_link.exam_id,
+                    "exam_name": exam_link.exam.exam_name,
+                    "start_time": exam_link.exam.start_time.isoformat() if exam_link.exam.start_time else None,
+                    "end_time": exam_link.exam.end_time.isoformat() if exam_link.exam.end_time else None,
+                })
+        
         chapter_data = {
             "id": chapter.id,
             "title": chapter.title,
             "sort_order": chapter.sort_order,
             "sections": [],
-            "exam_papers": [{"id": ep.exam_paper_id} for ep in exam_papers_by_chapter.get(chapter.id, [])],
+            "exam_papers": chapter_exams,  # 为保持API兼容性，字段名仍为exam_papers，但实际是考试列表
         }
         
         # 添加小节
         for section in sections[chapter.id]:
+            # 构建小节的考试列表
+            section_exams = []
+            for exam_link in exams_by_chapter.get(section.id, []):
+                if exam_link.exam:
+                    section_exams.append({
+                        "id": exam_link.exam_id,
+                        "exam_name": exam_link.exam.exam_name,
+                        "start_time": exam_link.exam.start_time.isoformat() if exam_link.exam.start_time else None,
+                        "end_time": exam_link.exam.end_time.isoformat() if exam_link.exam.end_time else None,
+                    })
+            
             section_data = {
                 "id": section.id,
                 "title": section.title,
                 "sort_order": section.sort_order,
                 "resources": [],
-                "exam_papers": [{"id": ep.exam_paper_id} for ep in exam_papers_by_chapter.get(section.id, [])],
+                "exam_papers": section_exams,  # 为保持API兼容性，字段名仍为exam_papers，但实际是考试列表
                 "homeworks": [
                     {
                         "id": hw.id,
@@ -562,7 +586,9 @@ async def link_exam_paper(
     current_user = Depends(get_current_user),
 ) -> Any:
     """
-    关联试卷到章或小节
+    关联考试到章或小节
+    注意：为保持API兼容性，参数名为exam_paper_id，但实际接收的是exam_id
+    正确的业务逻辑：章节 → 考试（考试已关联试卷）
     """
     chapter_result = await db.execute(
         select(CourseChapter).options(selectinload(CourseChapter.course))
@@ -576,28 +602,31 @@ async def link_exam_paper(
     if chapter.course.main_teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
     
-    # 验证试卷存在且属于当前教师
-    exam_paper_result = await db.execute(
-        select(ExamPaper).where(ExamPaper.id == exam_data.exam_paper_id)
-    )
-    exam_paper = exam_paper_result.scalars().first()
+    # 参数名是exam_paper_id，但实际是exam_id（为保持API兼容性）
+    exam_id = exam_data.exam_paper_id
     
-    if not exam_paper or exam_paper.teacher_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Exam paper not found")
+    # 验证考试存在且属于当前教师
+    exam_result = await db.execute(
+        select(Exam).where(Exam.id == exam_id)
+    )
+    exam = exam_result.scalars().first()
+    
+    if not exam or exam.teacher_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Exam not found or access denied")
     
     # 检查是否已关联
     existing_result = await db.execute(
-        select(CourseChapterExamPaper).where(
-            CourseChapterExamPaper.chapter_id == chapter_id,
-            CourseChapterExamPaper.exam_paper_id == exam_data.exam_paper_id
+        select(CourseChapterExam).where(
+            CourseChapterExam.chapter_id == chapter_id,
+            CourseChapterExam.exam_id == exam_id
         )
     )
     if existing_result.scalars().first():
-        raise HTTPException(status_code=400, detail="Exam paper already linked")
+        raise HTTPException(status_code=400, detail="Exam already linked")
     
-    link = CourseChapterExamPaper(
+    link = CourseChapterExam(
         chapter_id=chapter_id,
-        exam_paper_id=exam_data.exam_paper_id
+        exam_id=exam_id
     )
     db.add(link)
     await db.commit()
@@ -606,7 +635,7 @@ async def link_exam_paper(
     return {
         "id": link.id,
         "chapter_id": link.chapter_id,
-        "exam_paper_id": link.exam_paper_id,
+        "exam_paper_id": link.exam_id,  # 为保持API兼容性，返回字段名为exam_paper_id
     }
 
 @router.delete("/chapters/{chapter_id}/exam-papers/{exam_paper_id}")
@@ -617,7 +646,8 @@ async def unlink_exam_paper(
     current_user = Depends(get_current_user),
 ) -> Any:
     """
-    取消关联试卷
+    取消关联考试
+    注意：为保持API兼容性，参数名为exam_paper_id，但实际接收的是exam_id
     """
     chapter_result = await db.execute(
         select(CourseChapter).options(selectinload(CourseChapter.course))
@@ -631,10 +661,13 @@ async def unlink_exam_paper(
     if chapter.course.main_teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
     
+    # 参数名是exam_paper_id，但实际是exam_id（为保持API兼容性）
+    exam_id = exam_paper_id
+    
     link_result = await db.execute(
-        select(CourseChapterExamPaper).where(
-            CourseChapterExamPaper.chapter_id == chapter_id,
-            CourseChapterExamPaper.exam_paper_id == exam_paper_id
+        select(CourseChapterExam).where(
+            CourseChapterExam.chapter_id == chapter_id,
+            CourseChapterExam.exam_id == exam_id
         )
     )
     link = link_result.scalars().first()
@@ -645,7 +678,7 @@ async def unlink_exam_paper(
     await db.delete(link)
     await db.commit()
     
-    return {"message": "Exam paper unlinked successfully"}
+    return {"message": "Exam unlinked successfully"}
 
 @router.post("/chapters/{chapter_id}/homeworks")
 async def create_homework(
@@ -759,4 +792,546 @@ async def delete_homework(
     await db.commit()
     
     return {"message": "Homework deleted successfully"}
+
+class ChapterReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+class ChapterReorderRequest(BaseModel):
+    chapters: List[ChapterReorderItem]
+
+@router.put("/courses/{course_id}/chapters/reorder")
+async def reorder_chapters(
+    course_id: int,
+    request: ChapterReorderRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    调整章节顺序
+    """
+    # 验证课程权限
+    course_result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
+    course = course_result.scalars().first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    if course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
+    
+    # 批量更新章节顺序
+    try:
+        for item in request.chapters:
+            sql = text("""
+                UPDATE course_chapter 
+                SET sort_order = :sort_order 
+                WHERE id = :chapter_id AND course_id = :course_id
+            """)
+            await db.execute(sql, {
+                "sort_order": item.sort_order,
+                "chapter_id": item.id,
+                "course_id": course_id
+            })
+        
+        await db.commit()
+        logging.info(f"成功更新 {len(request.chapters)} 个章节的排序")
+        
+        return {"message": "Chapters reordered successfully"}
+    except Exception as e:
+        await db.rollback()
+        logging.error(f"更新章节排序失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"更新章节排序失败: {str(e)}")
+
+# ============= 学习规则API =============
+
+class LearningRuleCreate(BaseModel):
+    rule_type: str  # none, completion, exam
+    completion_percentage: Optional[int] = None
+    target_chapter_id: Optional[int] = None
+
+@router.post("/chapters/{chapter_id}/learning-rule")
+async def set_learning_rule(
+    chapter_id: int,
+    rule_data: LearningRuleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    设置章节的学习规则
+    """
+    from app.models.course_outline import CourseChapterLearningRule
+    
+    # 验证章节存在且有权限
+    chapter_result = await db.execute(
+        select(CourseChapter).options(selectinload(CourseChapter.course))
+        .where(CourseChapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    if chapter.course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
+    
+    # 验证规则参数
+    if rule_data.rule_type not in ['none', 'completion', 'exam']:
+        raise HTTPException(status_code=400, detail="Invalid rule_type")
+    
+    if rule_data.rule_type == 'completion':
+        if not rule_data.completion_percentage or rule_data.completion_percentage < 0 or rule_data.completion_percentage > 100:
+            raise HTTPException(status_code=400, detail="completion_percentage must be between 0 and 100")
+        if not rule_data.target_chapter_id:
+            raise HTTPException(status_code=400, detail="target_chapter_id is required for completion rule")
+    
+    if rule_data.rule_type == 'exam' and not rule_data.target_chapter_id:
+        raise HTTPException(status_code=400, detail="target_chapter_id is required for exam rule")
+    
+    # 验证目标章节存在
+    if rule_data.target_chapter_id:
+        target_result = await db.execute(
+            select(CourseChapter).where(
+                CourseChapter.id == rule_data.target_chapter_id,
+                CourseChapter.course_id == chapter.course_id
+            )
+        )
+        if not target_result.scalars().first():
+            raise HTTPException(status_code=400, detail="Target chapter not found")
+    
+    # 检查是否已存在规则
+    existing_result = await db.execute(
+        select(CourseChapterLearningRule).where(CourseChapterLearningRule.chapter_id == chapter_id)
+    )
+    existing_rule = existing_result.scalars().first()
+    
+    if existing_rule:
+        # 更新现有规则
+        existing_rule.rule_type = rule_data.rule_type
+        existing_rule.completion_percentage = rule_data.completion_percentage
+        existing_rule.target_chapter_id = rule_data.target_chapter_id
+    else:
+        # 创建新规则
+        new_rule = CourseChapterLearningRule(
+            chapter_id=chapter_id,
+            rule_type=rule_data.rule_type,
+            completion_percentage=rule_data.completion_percentage,
+            target_chapter_id=rule_data.target_chapter_id
+        )
+        db.add(new_rule)
+    
+    await db.commit()
+    
+    return {
+        "message": "Learning rule set successfully",
+        "rule_type": rule_data.rule_type,
+        "completion_percentage": rule_data.completion_percentage,
+        "target_chapter_id": rule_data.target_chapter_id
+    }
+
+@router.get("/chapters/{chapter_id}/learning-rule")
+async def get_learning_rule(
+    chapter_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    获取章节的学习规则
+    """
+    from app.models.course_outline import CourseChapterLearningRule
+    
+    # 验证章节存在
+    chapter_result = await db.execute(
+        select(CourseChapter).options(selectinload(CourseChapter.course))
+        .where(CourseChapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    # 获取学习规则
+    rule_result = await db.execute(
+        select(CourseChapterLearningRule).where(CourseChapterLearningRule.chapter_id == chapter_id)
+    )
+    rule = rule_result.scalars().first()
+    
+    if not rule:
+        # 返回默认规则
+        return {
+            "rule_type": "none",
+            "completion_percentage": None,
+            "target_chapter_id": None
+        }
+    
+    return {
+        "rule_type": rule.rule_type,
+        "completion_percentage": rule.completion_percentage,
+        "target_chapter_id": rule.target_chapter_id
+    }
+
+# ============= 知识图谱关联API =============
+
+class KnowledgeGraphLink(BaseModel):
+    knowledge_graph_id: int
+    knowledge_node_id: Optional[int] = None
+
+@router.post("/chapters/{chapter_id}/knowledge-graph")
+async def link_knowledge_graph(
+    chapter_id: int,
+    kg_data: KnowledgeGraphLink,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    关联知识图谱到章节
+    """
+    from app.models.course_outline import CourseChapterKnowledgeGraph
+    from app.models.knowledge_graph import KnowledgeGraph, KnowledgeNode
+    
+    # 验证章节存在且有权限
+    chapter_result = await db.execute(
+        select(CourseChapter).options(selectinload(CourseChapter.course))
+        .where(CourseChapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    if chapter.course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
+    
+    # 验证知识图谱存在
+    kg_result = await db.execute(
+        select(KnowledgeGraph).where(KnowledgeGraph.id == kg_data.knowledge_graph_id)
+    )
+    if not kg_result.scalars().first():
+        raise HTTPException(status_code=404, detail="Knowledge graph not found")
+    
+    # 如果指定了节点，验证节点存在且属于该图谱
+    if kg_data.knowledge_node_id:
+        node_result = await db.execute(
+            select(KnowledgeNode).where(
+                KnowledgeNode.id == kg_data.knowledge_node_id,
+                KnowledgeNode.graph_id == kg_data.knowledge_graph_id
+            )
+        )
+        if not node_result.scalars().first():
+            raise HTTPException(status_code=404, detail="Knowledge node not found or does not belong to the specified graph")
+    
+    # 检查是否已存在关联（每个章节只能关联一个知识图谱）
+    existing_result = await db.execute(
+        select(CourseChapterKnowledgeGraph).where(CourseChapterKnowledgeGraph.chapter_id == chapter_id)
+    )
+    existing_link = existing_result.scalars().first()
+    
+    if existing_link:
+        # 更新现有关联
+        existing_link.knowledge_graph_id = kg_data.knowledge_graph_id
+        existing_link.knowledge_node_id = kg_data.knowledge_node_id
+    else:
+        # 创建新关联
+        new_link = CourseChapterKnowledgeGraph(
+            chapter_id=chapter_id,
+            knowledge_graph_id=kg_data.knowledge_graph_id,
+            knowledge_node_id=kg_data.knowledge_node_id
+        )
+        db.add(new_link)
+    
+    await db.commit()
+    
+    return {
+        "message": "Knowledge graph linked successfully",
+        "knowledge_graph_id": kg_data.knowledge_graph_id,
+        "knowledge_node_id": kg_data.knowledge_node_id
+    }
+
+@router.delete("/chapters/{chapter_id}/knowledge-graph")
+async def unlink_knowledge_graph(
+    chapter_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    取消章节的知识图谱关联
+    """
+    from app.models.course_outline import CourseChapterKnowledgeGraph
+    
+    # 验证章节存在且有权限
+    chapter_result = await db.execute(
+        select(CourseChapter).options(selectinload(CourseChapter.course))
+        .where(CourseChapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    if chapter.course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
+    
+    # 删除关联
+    link_result = await db.execute(
+        select(CourseChapterKnowledgeGraph).where(CourseChapterKnowledgeGraph.chapter_id == chapter_id)
+    )
+    link = link_result.scalars().first()
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Knowledge graph link not found")
+    
+    await db.delete(link)
+    await db.commit()
+    
+    return {"message": "Knowledge graph unlinked successfully"}
+
+@router.get("/chapters/{chapter_id}/knowledge-graph")
+async def get_chapter_knowledge_graph(
+    chapter_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    获取章节关联的知识图谱
+    """
+    from app.models.course_outline import CourseChapterKnowledgeGraph
+    
+    # 验证章节存在
+    chapter_result = await db.execute(
+        select(CourseChapter).where(CourseChapter.id == chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    # 获取知识图谱关联
+    link_result = await db.execute(
+        select(CourseChapterKnowledgeGraph)
+        .options(
+            selectinload(CourseChapterKnowledgeGraph.knowledge_graph),
+            selectinload(CourseChapterKnowledgeGraph.knowledge_node)
+        )
+        .where(CourseChapterKnowledgeGraph.chapter_id == chapter_id)
+    )
+    link = link_result.scalars().first()
+    
+    if not link:
+        return None
+    
+    return {
+        "knowledge_graph_id": link.knowledge_graph_id,
+        "knowledge_graph_name": link.knowledge_graph.graph_name if link.knowledge_graph else None,
+        "knowledge_node_id": link.knowledge_node_id,
+        "knowledge_node_name": link.knowledge_node.node_name if link.knowledge_node else None
+    }
+
+# ============= 课程预览API =============
+
+@router.get("/courses/{course_id}/preview")
+async def get_course_preview(
+    course_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    获取课程预览信息（包括章节结构、学习规则、关联资源）
+    用于教师预览课程，不需要权限验证
+    """
+    from app.models.course_outline import CourseChapterLearningRule, CourseChapterKnowledgeGraph
+    from app.models.knowledge_graph import KnowledgeGraph
+    
+    # 获取课程信息（包括教师和专业信息）
+    from app.models.base import Major
+    course_result = await db.execute(
+        select(Course)
+        .options(
+            selectinload(Course.teacher),
+            selectinload(Course.major)
+        )
+        .where(Course.id == course_id, Course.is_deleted == False)
+    )
+    course = course_result.scalars().first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # 获取所有章节
+    sql = text("""
+        SELECT id, course_id, title, sort_order, parent_id 
+        FROM course_chapter 
+        WHERE course_id = :course_id 
+        ORDER BY sort_order, id
+    """)
+    result = await db.execute(sql, {"course_id": course_id})
+    rows = result.all()
+    
+    all_chapters = []
+    chapter_ids = []
+    for row in rows:
+        chapter_obj = {
+            "id": row.id,
+            "title": row.title,
+            "sort_order": row.sort_order,
+            "parent_id": row.parent_id
+        }
+        all_chapters.append(chapter_obj)
+        chapter_ids.append(row.id)
+    
+    # 获取学习规则
+    if chapter_ids:
+        rules_result = await db.execute(
+            select(CourseChapterLearningRule).where(CourseChapterLearningRule.chapter_id.in_(chapter_ids))
+        )
+        all_rules = rules_result.scalars().all()
+        rules_by_chapter = {rule.chapter_id: rule for rule in all_rules}
+        
+        # 获取知识图谱关联
+        kg_result = await db.execute(
+            select(CourseChapterKnowledgeGraph)
+            .options(
+                selectinload(CourseChapterKnowledgeGraph.knowledge_graph),
+                selectinload(CourseChapterKnowledgeGraph.knowledge_node)
+            )
+            .where(CourseChapterKnowledgeGraph.chapter_id.in_(chapter_ids))
+        )
+        all_kg_links = kg_result.scalars().all()
+        kg_by_chapter = {link.chapter_id: link for link in all_kg_links}
+        
+        # 获取资源关联
+        resources_result = await db.execute(
+            select(CourseSectionResource).where(CourseSectionResource.chapter_id.in_(chapter_ids))
+        )
+        all_resources = resources_result.scalars().all()
+        resources_by_chapter = {}
+        for res in all_resources:
+            if res.chapter_id not in resources_by_chapter:
+                resources_by_chapter[res.chapter_id] = []
+            resources_by_chapter[res.chapter_id].append(res)
+        
+        # 获取试卷关联
+        exam_papers_result = await db.execute(
+            select(CourseChapterExamPaper)
+            .options(selectinload(CourseChapterExamPaper.exam_paper))
+            .where(CourseChapterExamPaper.chapter_id.in_(chapter_ids))
+        )
+        all_exam_papers = exam_papers_result.scalars().all()
+        exam_papers_by_chapter = {}
+        for ep in all_exam_papers:
+            if ep.chapter_id not in exam_papers_by_chapter:
+                exam_papers_by_chapter[ep.chapter_id] = []
+            exam_papers_by_chapter[ep.chapter_id].append(ep)
+    else:
+        rules_by_chapter = {}
+        kg_by_chapter = {}
+        resources_by_chapter = {}
+        exam_papers_by_chapter = {}
+    
+    # 构建章节树
+    chapters = [ch for ch in all_chapters if ch["parent_id"] is None]
+    sections = {ch["id"]: [] for ch in chapters}
+    
+    for section in all_chapters:
+        if section["parent_id"]:
+            if section["parent_id"] in sections:
+                sections[section["parent_id"]].append(section)
+    
+    # 构建返回数据
+    outline = []
+    for chapter in chapters:
+        chapter_id = chapter["id"]
+        rule = rules_by_chapter.get(chapter_id)
+        kg_link = kg_by_chapter.get(chapter_id)
+        
+        chapter_data = {
+            "id": chapter_id,
+            "title": chapter["title"],
+            "sort_order": chapter["sort_order"],
+            "learning_rule": {
+                "rule_type": rule.rule_type if rule else "none",
+                "completion_percentage": rule.completion_percentage if rule else None,
+                "target_chapter_id": rule.target_chapter_id if rule else None
+            } if rule else {"rule_type": "none"},
+            "knowledge_graph": {
+                "graph_id": kg_link.knowledge_graph_id,
+                "graph_name": kg_link.knowledge_graph.graph_name if kg_link.knowledge_graph else None,
+                "node_id": kg_link.knowledge_node_id,
+                "node_name": kg_link.knowledge_node.node_name if kg_link.knowledge_node else None
+            } if kg_link else None,
+            "exam_papers": [
+                {
+                    "id": ep.exam_paper_id,
+                    "exam_paper_name": ep.exam_paper.paper_name if ep.exam_paper else None
+                }
+                for ep in exam_papers_by_chapter.get(chapter_id, [])
+            ],
+            "sections": []
+        }
+        
+        # 添加小节
+        for section in sections[chapter_id]:
+            section_id = section["id"]
+            section_rule = rules_by_chapter.get(section_id)
+            section_kg_link = kg_by_chapter.get(section_id)
+            
+            section_data = {
+                "id": section_id,
+                "title": section["title"],
+                "sort_order": section["sort_order"],
+                "learning_rule": {
+                    "rule_type": section_rule.rule_type if section_rule else "none",
+                    "completion_percentage": section_rule.completion_percentage if section_rule else None,
+                    "target_chapter_id": section_rule.target_chapter_id if section_rule else None
+                } if section_rule else {"rule_type": "none"},
+                "knowledge_graph": {
+                    "graph_id": section_kg_link.knowledge_graph_id,
+                    "graph_name": section_kg_link.knowledge_graph.graph_name if section_kg_link.knowledge_graph else None,
+                    "node_id": section_kg_link.knowledge_node_id,
+                    "node_name": section_kg_link.knowledge_node.node_name if section_kg_link.knowledge_node else None
+                } if section_kg_link else None,
+                "resources": [
+                    {
+                        "id": res.id,
+                        "resource_type": res.resource_type,
+                        "resource_id": res.resource_id,
+                        "sort_order": res.sort_order
+                    }
+                    for res in resources_by_chapter.get(section_id, [])
+                ],
+                "exam_papers": [
+                    {
+                        "id": ep.exam_paper_id,
+                        "exam_paper_name": ep.exam_paper.paper_name if ep.exam_paper else None
+                    }
+                    for ep in exam_papers_by_chapter.get(section_id, [])
+                ]
+            }
+            
+            chapter_data["sections"].append(section_data)
+        
+        outline.append(chapter_data)
+    
+    return {
+        "course": {
+            "id": course.id,
+            "title": course.title,
+            "cover_url": course.cover_url,
+            "course_category": course.course_category,
+            "enrollment_type": course.enrollment_type,
+            "credits": course.credits,
+            "introduction": course.introduction,
+            "objectives": course.objectives,
+            "teacher": {
+                "id": course.teacher.id,
+                "name": course.teacher.name,
+                "email": course.teacher.email
+            } if course.teacher else None,
+            "major": {
+                "id": course.major.id,
+                "name": course.major.name
+            } if course.major else None
+        },
+        "outline": outline
+    }
 

@@ -124,8 +124,8 @@ async def get_questions(
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
     
-    # 获取分页数据
-    query = base_query.offset(skip).limit(limit).order_by(Question.created_at.desc())
+    # 获取分页数据（按更新时间倒序）
+    query = base_query.offset(skip).limit(limit).order_by(Question.updated_at.desc())
     result = await db.execute(query)
     questions = result.scalars().all()
     
@@ -310,6 +310,13 @@ async def update_question(
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """更新题目"""
+    try:
+        logger.info(f"🔍 [UPDATE START] Question ID: {question_id}, Teacher ID: {teacher_id}")
+        logger.info(f"📝 [UPDATE DATA] Type: {question_type}, Title: {title[:50] if title else None}")
+        logger.info(f"📋 [UPDATE OPTIONS] Options data: {options[:200] if options else 'None'}")
+    except Exception as e:
+        logger.error(f"❌ Error logging request data: {str(e)}")
+    
     result = await db.execute(
         select(Question).where(
             and_(
@@ -354,11 +361,10 @@ async def update_question(
         question.explanation_image = save_image(explanation_image, teacher_id, "explanation")
     
     # 更新选项
-    if options and question.question_type in ["single_choice", "multiple_choice"]:
+    if options and question.question_type in ["single_choice", "multiple_choice", "true_false"]:
+        logger.info(f"Updating options for question {question_id}, options data: {options}")
+        
         # 删除旧选项
-        await db.execute(
-            select(QuestionOption).where(QuestionOption.question_id == question_id)
-        )
         old_options = await db.execute(
             select(QuestionOption).where(QuestionOption.question_id == question_id)
         )
@@ -368,18 +374,45 @@ async def update_question(
         # 添加新选项
         try:
             options_data = json.loads(options)
-            for idx, opt_data in enumerate(options_data):
-                option = QuestionOption(
-                    question_id=question.id,
-                    option_label=opt_data.get("option_label", chr(65 + idx)),
-                    option_text=opt_data.get("option_text", ""),
-                    option_image=opt_data.get("option_image") or opt_data.get("option_image_path"),  # 支持两种字段名
-                    is_correct=opt_data.get("is_correct", False),
-                    sort_order=idx
-                )
-                db.add(option)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="选项数据格式错误")
+            logger.info(f"Parsed options data: {options_data}")
+            
+            if not isinstance(options_data, list):
+                raise HTTPException(status_code=422, detail="选项数据必须是数组格式")
+            
+            # 如果选项数组不为空,才进行验证和添加
+            if len(options_data) > 0:
+                for idx, opt_data in enumerate(options_data):
+                    if not isinstance(opt_data, dict):
+                        raise HTTPException(status_code=422, detail=f"选项 {idx} 必须是对象格式")
+                    
+                    if "option_text" not in opt_data:
+                        raise HTTPException(status_code=422, detail=f"选项 {idx} 缺少 option_text 字段")
+                    
+                    # 空选项内容也应该被允许
+                    option_text = opt_data.get("option_text", "")
+                    
+                    # 跳过空选项
+                    if not option_text or not option_text.strip():
+                        logger.warning(f"Skipping empty option at index {idx}")
+                        continue
+                    
+                    option = QuestionOption(
+                        question_id=question.id,
+                        option_label=opt_data.get("option_label", chr(65 + idx)),
+                        option_text=option_text,
+                        option_image=opt_data.get("option_image") or opt_data.get("option_image_path"),
+                        is_correct=opt_data.get("is_correct", False),
+                        sort_order=idx
+                    )
+                    db.add(option)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}, options string: {options}")
+            raise HTTPException(status_code=422, detail=f"选项数据格式错误: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating options: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"更新选项时发生错误: {str(e)}")
     
     question.updated_at = datetime.utcnow()
     await db.commit()

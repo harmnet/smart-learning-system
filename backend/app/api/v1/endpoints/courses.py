@@ -58,6 +58,7 @@ async def get_courses(
     limit: int = 100,
     search: Optional[str] = None,
     teacher_id: Optional[int] = None,
+    include_deleted: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -71,6 +72,11 @@ async def get_courses(
     
     # 应用筛选条件
     conditions = []
+    
+    # 默认过滤已删除的课程
+    if not include_deleted:
+        conditions.append(Course.is_deleted == False)
+    
     if search:
         conditions.append(Course.title.ilike(f"%{search}%"))
     
@@ -239,12 +245,15 @@ async def create_course(
         code=course_data.code,
         description=course_data.description,
         credits=course_data.credits or 2,
-        course_type=course_data.course_type,
+        course_type=course_data.course_type,  # 保留字段，用于兼容
+        course_category=course_data.course_category,  # 课程类型
+        enrollment_type=course_data.enrollment_type,  # 选课类型
         hours=course_data.hours,
         introduction=course_data.introduction,
         objectives=course_data.objectives,
         main_teacher_id=main_teacher_id,
         is_public=course_data.is_public or False,
+        is_deleted=False,  # 新建课程默认未删除
         major_id=major_id_to_use  # 根据主讲教师或当前用户确定专业
     )
     db.add(course)
@@ -380,6 +389,10 @@ async def update_course(
             course.credits = course_data.credits
         if course_data.course_type is not None:
             course.course_type = course_data.course_type
+        if course_data.course_category is not None:
+            course.course_category = course_data.course_category
+        if course_data.enrollment_type is not None:
+            course.enrollment_type = course_data.enrollment_type
         if course_data.hours is not None:
             course.hours = course_data.hours
         if course_data.introduction is not None:
@@ -639,4 +652,60 @@ async def get_course_classes(
             })
     
     return classes
+
+@router.delete("/{course_id}")
+async def delete_course(
+    course_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    逻辑删除课程（设置is_deleted=True）
+    """
+    # 获取课程
+    result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
+    course = result.scalars().first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 验证权限：只有主讲教师可以删除课程
+    if course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="只有主讲教师可以删除课程")
+    
+    # 逻辑删除
+    course.is_deleted = True
+    await db.commit()
+    
+    return {"message": "课程已删除"}
+
+@router.put("/{course_id}/restore")
+async def restore_course(
+    course_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> Any:
+    """
+    恢复已删除的课程
+    """
+    # 获取课程
+    result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
+    course = result.scalars().first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 验证权限：只有主讲教师可以恢复课程
+    if course.main_teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="只有主讲教师可以恢复课程")
+    
+    # 恢复课程
+    course.is_deleted = False
+    await db.commit()
+    
+    return {"message": "课程已恢复"}
 

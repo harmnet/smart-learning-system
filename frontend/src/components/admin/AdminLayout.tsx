@@ -62,8 +62,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
                   {userName.charAt(0).toUpperCase()}
                 </div>
-                <div className="text-left hidden md:block">
-                  <div className="text-sm font-medium text-neutral-700">{userName}</div>
+                <div 
+                  className="text-left hidden md:block cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push('/admin');
+                  }}
+                >
+                  <div className="text-sm font-medium text-neutral-700 hover:text-blue-600 transition-colors">{userName}</div>
                 </div>
                 <svg className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
@@ -75,9 +81,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-lg border border-neutral-100 py-2 z-50">
-                    <div className="px-4 py-3 border-b border-neutral-100">
+                    <div 
+                      className="px-4 py-3 border-b border-neutral-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        router.push('/admin');
+                      }}
+                    >
                       <div className="text-sm font-bold text-neutral-900">{userName}</div>
                       <div className="text-xs text-neutral-500 truncate">{userEmail}</div>
+                      <div className="text-xs text-blue-600 mt-1">返回首页</div>
                     </div>
                     <button
                       onClick={handleLogout}

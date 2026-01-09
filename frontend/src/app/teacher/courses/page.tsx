@@ -9,10 +9,12 @@ import { teacherService } from '@/services/teacher.service';
 import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
 import ImagePreviewModal from '@/components/admin/ImagePreviewModal';
+import { useToast } from '@/hooks/useToast';
 
 export default function CoursesPage() {
   const { t } = useLanguage();
   const router = useRouter();
+  const toast = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +25,10 @@ export default function CoursesPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     code: '',
+    credits: 2,
     course_type: 'required' as 'required' | 'elective',
+    course_category: 'general' as 'general' | 'professional_basic' | 'professional_core' | 'expansion' | 'elective_course',
+    enrollment_type: 'required' as 'required' | 'elective' | 'retake',
     hours: 0,
     introduction: '',
     objectives: '',
@@ -102,7 +107,7 @@ export default function CoursesPage() {
     } catch (error: any) {
       console.error('Failed to load courses:', error);
       const errorMessage = error.response?.data?.detail || error.message || '加载课程失败';
-      alert(`错误: ${errorMessage}`);
+      toast.error(`错误: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -147,7 +152,10 @@ export default function CoursesPage() {
       setEditForm({
         name: courseDetail.name || courseDetail.title || '',
         code: courseDetail.code || '',
+        credits: courseDetail.credits || 2,
         course_type: (courseDetail.course_type as 'required' | 'elective') || 'required',
+        course_category: (courseDetail.course_category as any) || 'general',
+        enrollment_type: (courseDetail.enrollment_type as any) || 'required',
         hours: courseDetail.hours || 0,
         introduction: courseDetail.introduction || '',
         objectives: courseDetail.objectives || '',
@@ -162,7 +170,7 @@ export default function CoursesPage() {
       setEditModalOpen(true);
     } catch (error: any) {
       console.error('Failed to load course detail:', error);
-      alert('加载课程详情失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('加载课程详情失败: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -184,13 +192,13 @@ export default function CoursesPage() {
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
-      alert('只能上传图片文件');
+      toast.warning('只能上传图片文件');
       return;
     }
     
     // 检查文件大小（2MB，与后端一致）
     if (file.size > 2 * 1024 * 1024) {
-      alert('文件大小不能超过2MB');
+      toast.warning('文件大小不能超过2MB');
       return;
     }
     
@@ -203,7 +211,7 @@ export default function CoursesPage() {
       await loadEditAvailableCovers();
     } catch (error: any) {
       console.error('Failed to upload cover:', error);
-      alert('封面上传失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('封面上传失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setEditUploadingCover(false);
     }
@@ -234,27 +242,27 @@ export default function CoursesPage() {
     
     // 验证必填字段
     if (!editForm.name.trim()) {
-      alert(t.teacher.courseManagement?.courseNameRequired || '请输入课程名称');
+      toast.warning(t.teacher.courseManagement?.courseNameRequired || '请输入课程名称');
       return;
     }
     if (!editForm.hours || editForm.hours <= 0) {
-      alert(t.teacher.courseManagement?.courseHoursRequired || '课程学时必须大于0');
+      toast.warning(t.teacher.courseManagement?.courseHoursRequired || '课程学时必须大于0');
       return;
     }
     if (!editForm.cover_id) {
-      alert(t.teacher.courseManagement?.coverImageRequired || '请选择课程封面');
+      toast.warning(t.teacher.courseManagement?.coverImageRequired || '请选择课程封面');
       return;
     }
     if (!editForm.main_teacher_id) {
-      alert(t.teacher.courseManagement?.mainTeacherRequired || '请选择课程讲师');
+      toast.warning(t.teacher.courseManagement?.mainTeacherRequired || '请选择课程讲师');
       return;
     }
     if (!editForm.introduction.trim()) {
-      alert(t.teacher.courseManagement?.introductionRequired || '请输入课程简介');
+      toast.warning(t.teacher.courseManagement?.introductionRequired || '请输入课程简介');
       return;
     }
     if (!editForm.objectives.trim()) {
-      alert(t.teacher.courseManagement?.objectivesRequired || '请输入授课目标');
+      toast.warning(t.teacher.courseManagement?.objectivesRequired || '请输入授课目标');
       return;
     }
     
@@ -262,7 +270,10 @@ export default function CoursesPage() {
       await courseService.update(editingCourse.id, {
         name: editForm.name,
         code: editForm.code,
+        credits: editForm.credits,
         course_type: editForm.course_type,
+        course_category: editForm.course_category,
+        enrollment_type: editForm.enrollment_type,
         hours: editForm.hours,
         introduction: editForm.introduction,
         objectives: editForm.objectives,
@@ -270,7 +281,7 @@ export default function CoursesPage() {
         cover_id: editForm.cover_id,
         main_teacher_id: editForm.main_teacher_id,
       });
-      alert(t.teacher.courseManagement?.updateSuccess || '课程更新成功');
+      toast.success(t.teacher.courseManagement?.updateSuccess || '课程更新成功');
       setEditModalOpen(false);
       setEditingCourse(null);
       setEditCoverPreview('');
@@ -281,7 +292,7 @@ export default function CoursesPage() {
       loadCourses();
     } catch (error: any) {
       console.error('Failed to update course:', error);
-      alert('更新失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('更新失败: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -304,14 +315,14 @@ export default function CoursesPage() {
         // 更新课程对象，确保使用最新的专业信息
         setLinkingCourse({ ...course, major_id: courseDetail.major_id });
       } else {
-        alert(t.teacher.courseManagement?.courseNotLinkedMajor || '课程未关联专业，无法关联班级');
+        toast.warning(t.teacher.courseManagement?.courseNotLinkedMajor || '课程未关联专业，无法关联班级');
         return;
       }
       
       setLinkClassesModalOpen(true);
     } catch (error: any) {
       console.error('Failed to load classes:', error);
-      alert('加载班级列表失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('加载班级列表失败: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -321,13 +332,13 @@ export default function CoursesPage() {
     
     try {
       await courseService.linkClasses(linkingCourse.id, selectedClassIds);
-      alert(t.teacher.courseManagement?.linkClassesSuccess || '关联班级成功');
+      toast.success(t.teacher.courseManagement?.linkClassesSuccess || '关联班级成功');
       setLinkClassesModalOpen(false);
       setLinkingCourse(null);
       loadCourses();
     } catch (error: any) {
       console.error('Failed to link classes:', error);
-      alert('关联失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('关联失败: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -339,8 +350,35 @@ export default function CoursesPage() {
     router.push(`/teacher/courses/${course.id}/view`);
   };
 
+  const handleDeleteCourse = async (course: Course) => {
+    if (!confirm(`确定要删除课程"${course.name || course.title}"吗？`)) {
+      return;
+    }
+
+    try {
+      await courseService.delete(course.id);
+      toast.success('课程已删除');
+      loadCourses();
+    } catch (error: any) {
+      console.error('Failed to delete course:', error);
+      toast.error('删除课程失败: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleRestoreCourse = async (course: Course) => {
+    try {
+      await courseService.restore(course.id);
+      toast.success('课程已恢复');
+      loadCourses();
+    } catch (error: any) {
+      console.error('Failed to restore course:', error);
+      toast.error('恢复课程失败: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
   return (
     <TeacherLayout>
+      <toast.ToastContainer />
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="px-8 py-6 border-b border-slate-100 bg-white">
@@ -454,6 +492,33 @@ export default function CoursesPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                       </svg>
                     </button>
+                    {course.is_deleted ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestoreCourse(course);
+                        }}
+                        className="p-2 bg-white rounded-lg shadow-md hover:bg-green-50 text-green-600 transition-colors"
+                        title="恢复课程"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCourse(course);
+                        }}
+                        className="p-2 bg-white rounded-lg shadow-md hover:bg-red-50 text-red-600 transition-colors"
+                        title="删除课程"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                      </button>
+                    )}
                   </div>
 
                   {/* 课程封面 */}
@@ -585,30 +650,74 @@ export default function CoursesPage() {
                 {/* 课程类型 */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    {t.teacher.courseManagement?.courseType || '课程类型'} <span className="text-red-500">*</span>
+                    课程类型 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editForm.course_category}
+                    onChange={(e) => setEditForm({ ...editForm, course_category: e.target.value as any })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="general">通识课</option>
+                    <option value="professional_basic">专业基础课</option>
+                    <option value="professional_core">专业核心课</option>
+                    <option value="expansion">拓展课</option>
+                    <option value="elective_course">选修课</option>
+                  </select>
+                </div>
+
+                {/* 选课类型 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    选课类型 <span className="text-red-500">*</span>
                   </label>
                   <div className="flex gap-4">
                     <label className="flex items-center">
                       <input
                         type="radio"
                         value="required"
-                        checked={editForm.course_type === 'required'}
-                        onChange={(e) => setEditForm({ ...editForm, course_type: e.target.value as 'required' })}
+                        checked={editForm.enrollment_type === 'required'}
+                        onChange={(e) => setEditForm({ ...editForm, enrollment_type: e.target.value as any })}
                         className="mr-2"
                       />
-                      <span>{t.teacher.courseManagement?.requiredCourse || '必修课'}</span>
+                      <span>必修课</span>
                     </label>
                     <label className="flex items-center">
                       <input
                         type="radio"
                         value="elective"
-                        checked={editForm.course_type === 'elective'}
-                        onChange={(e) => setEditForm({ ...editForm, course_type: e.target.value as 'elective' })}
+                        checked={editForm.enrollment_type === 'elective'}
+                        onChange={(e) => setEditForm({ ...editForm, enrollment_type: e.target.value as any })}
                         className="mr-2"
                       />
-                      <span>{t.teacher.courseManagement?.electiveCourse || '选修课'}</span>
+                      <span>选修课</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        value="retake"
+                        checked={editForm.enrollment_type === 'retake'}
+                        onChange={(e) => setEditForm({ ...editForm, enrollment_type: e.target.value as any })}
+                        className="mr-2"
+                      />
+                      <span>重修课</span>
                     </label>
                   </div>
+                </div>
+
+                {/* 课程学分 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    课程学分 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={editForm.credits}
+                    onChange={(e) => setEditForm({ ...editForm, credits: parseInt(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    min="1"
+                    max="10"
+                    required
+                  />
                 </div>
 
                 {/* 课程学时 */}

@@ -960,21 +960,20 @@ export default function QuestionBankPage() {
 
   return (
     <TeacherLayout>
-      <div className="h-full flex flex-col" style={{ fontFamily: "'Open Sans', sans-serif" }}>
+      <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50">
         {/* Header */}
-        <div className="px-8 py-6 border-b border-[#E2E8F0] bg-white">
+        <div className="px-8 py-6 bg-white/80 backdrop-blur-sm border-b border-slate-200/60">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-[#1E293B] mb-2" style={{ fontFamily: "'Poppins', sans-serif" }}>{t.teacher.questionBank.title}</h1>
-              <p className="text-sm text-[#64748B]">{t.teacher.questionBank.subtitle}</p>
+              <h1 className="text-2xl font-bold text-slate-900">{t.teacher.questionBank.title}</h1>
+              <p className="text-sm text-slate-600 mt-0.5">{t.teacher.questionBank.subtitle}</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleExportQuestions}
-                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-[#10B981] hover:bg-[#059669] shadow-lg shadow-[#10B981]/30 hover:shadow-xl hover:shadow-[#10B981]/40 flex items-center gap-2"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-blue-600/20 flex items-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
                 导出全部
@@ -985,10 +984,9 @@ export default function QuestionBankPage() {
                   setImportResult(null);
                   setImportFile(null);
                 }}
-                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-[#8B5CF6] hover:bg-[#7C3AED] shadow-lg shadow-[#8B5CF6]/30 hover:shadow-xl hover:shadow-[#8B5CF6]/40 flex items-center gap-2"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-all duration-200 flex items-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                 </svg>
                 批量导入
@@ -998,10 +996,9 @@ export default function QuestionBankPage() {
                   resetForm();
                   setCreateModalOpen(true);
                 }}
-                className="px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5 text-white bg-gradient-to-r from-[#2563EB] to-[#3B82F6] hover:from-[#1E40AF] hover:to-[#2563EB] shadow-lg shadow-[#2563EB]/30 hover:shadow-xl hover:shadow-[#2563EB]/40 flex items-center gap-2"
-                style={{ fontFamily: "'Poppins', sans-serif" }}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-blue-600/20 flex items-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 {t.teacher.questionBank.addQuestion}
@@ -1011,12 +1008,12 @@ export default function QuestionBankPage() {
         </div>
 
         {/* Filters */}
-        <div className="px-8 py-5 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+        <div className="px-8 py-4 bg-white/60 backdrop-blur-sm border-b border-slate-200/60">
           <div className="flex gap-4">
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="px-4 py-3 border-2 border-[#E2E8F0] rounded-xl text-sm bg-white hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200 text-[#1E293B]"
+              className="px-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-slate-400 transition-all bg-white"
             >
               <option value="">{t.teacher.questionBank.types.all}</option>
               {Object.entries(t.teacher.questionBank.types).map(([key, label]) => {
@@ -1031,7 +1028,7 @@ export default function QuestionBankPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="搜索题干或知识点"
-              className="flex-1 px-4 py-3 border-2 border-[#E2E8F0] rounded-xl text-sm bg-white hover:border-[#CBD5E1] focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10 outline-none transition-all duration-200 text-[#1E293B] placeholder-[#94A3B8]"
+              className="flex-1 px-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-slate-400 transition-all"
             />
             <div className="w-64">
               <KnowledgeGraphTreeSelect
@@ -1044,7 +1041,7 @@ export default function QuestionBankPage() {
             {knowledgePointFilter && (
               <button
                 onClick={() => setKnowledgePointFilter(null)}
-                className="px-4 py-3 text-sm text-[#EF4444] bg-[#FEF2F2] rounded-xl hover:bg-[#FEE2E2] transition-all duration-200 border border-[#FCA5A5]"
+                className="px-3 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-200 border border-red-200"
                 title="清除筛选"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1056,11 +1053,13 @@ export default function QuestionBankPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-[#F8FAFC] p-8">
+        <div className="flex-1 overflow-y-auto p-8">
           {loading ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-16 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563EB]"></div>
-              <p className="mt-4 text-sm text-[#64748B]">{t.common.loading}</p>
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-10 w-10 border-3 border-slate-300 border-t-slate-900 mb-4"></div>
+                <p className="text-sm text-slate-600">{t.common.loading}</p>
+              </div>
             </div>
           ) : questions.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-12 text-center">
@@ -1080,6 +1079,20 @@ export default function QuestionBankPage() {
                           <span className="text-xs text-slate-500">
                             难度: {question.difficulty === 1 ? t.teacher.questionBank.difficultyEasy : question.difficulty === 2 ? t.teacher.questionBank.difficultyMedium : t.teacher.questionBank.difficultyHard}
                           </span>
+                          {question.updated_at && (
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                              更新: {new Date(question.updated_at).toLocaleString('zh-CN', { 
+                                year: 'numeric', 
+                                month: '2-digit', 
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-lg font-bold text-slate-900 mb-2">{question.title}</h3>
                         {question.title_image && (

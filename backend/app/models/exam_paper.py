@@ -16,6 +16,7 @@ class ExamPaper(Base):
     total_score = Column(Numeric(10, 2), nullable=False, default=100)  # 试卷总分值
     question_order = Column(String, nullable=False, default="fixed")  # 试题顺序：fixed（固定）、random（随机）
     option_order = Column(String, nullable=False, default="fixed")  # 选项顺序：fixed（固定）、random（随机）
+    knowledge_point = Column(String(255), nullable=False)  # 关联的知识点名称
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)

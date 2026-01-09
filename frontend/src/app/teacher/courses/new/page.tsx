@@ -8,6 +8,7 @@ import { adminService } from '@/services/admin.service';
 import { teacherService } from '@/services/teacher.service';
 import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
+import { useToast } from '@/hooks/useToast';
 
 interface Teacher {
   id: number;
@@ -20,10 +21,14 @@ interface Teacher {
 export default function NewCoursePage() {
   const { t } = useLanguage();
   const router = useRouter();
+  const toast = useToast();
   
   // Form states
   const [courseName, setCourseName] = useState('');
+  const [courseCredits, setCourseCredits] = useState<number>(2);
   const [courseType, setCourseType] = useState<'required' | 'elective'>('required');
+  const [courseCategory, setCourseCategory] = useState<'general' | 'professional_basic' | 'professional_core' | 'expansion' | 'elective_course'>('general');
+  const [enrollmentType, setEnrollmentType] = useState<'required' | 'elective' | 'retake'>('required');
   const [courseHours, setCourseHours] = useState<number>(0);
   const [isPublic, setIsPublic] = useState<boolean>(false);
   const [majorName, setMajorName] = useState<string>('');
@@ -80,7 +85,7 @@ export default function NewCoursePage() {
       setAvailableCovers(covers);
     } catch (error: any) {
       console.error('Failed to load covers:', error);
-      alert('加载封面失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('加载封面失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setLoadingCovers(false);
     }
@@ -104,13 +109,13 @@ export default function NewCoursePage() {
     
     // 检查文件类型
     if (!file.type.startsWith('image/')) {
-      alert('只能上传图片文件');
+      toast.warning('只能上传图片文件');
       return;
     }
     
     // 检查文件大小（50MB）
     if (file.size > 50 * 1024 * 1024) {
-      alert('文件大小不能超过50MB');
+      toast.warning('文件大小不能超过50MB');
       return;
     }
     
@@ -125,7 +130,7 @@ export default function NewCoursePage() {
       setErrors({ ...errors, coverImage: '' });
     } catch (error: any) {
       console.error('Failed to upload cover:', error);
-      alert('封面上传失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('封面上传失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setUploadingCover(false);
     }
@@ -199,7 +204,10 @@ export default function NewCoursePage() {
       setSubmitting(true);
       await courseService.create({
         name: courseName,
+        credits: courseCredits,
         course_type: courseType,
+        course_category: courseCategory,
+        enrollment_type: enrollmentType,
         hours: courseHours,
         is_public: isPublic,
         cover_id: coverImageId!,
@@ -208,11 +216,11 @@ export default function NewCoursePage() {
         objectives: objectives,
       });
       
-      alert(t.teacher.courseManagement?.createSuccess || '课程创建成功');
+      toast.success(t.teacher.courseManagement?.createSuccess || '课程创建成功');
       router.push('/teacher/courses');
     } catch (error: any) {
       console.error('Failed to create course:', error);
-      alert('创建失败: ' + (error.response?.data?.detail || error.message));
+      toast.error('创建失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setSubmitting(false);
     }
@@ -227,6 +235,7 @@ export default function NewCoursePage() {
 
   return (
     <TeacherLayout>
+      <toast.ToastContainer />
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="px-8 py-6 border-b border-slate-100 bg-white">
@@ -280,38 +289,99 @@ export default function NewCoursePage() {
               {/* 课程类型 */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {t.teacher.courseManagement?.courseType || '课程类型'} <span className="text-red-500">*</span>
+                  课程类型 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={courseCategory}
+                  onChange={(e) => {
+                    setCourseCategory(e.target.value as any);
+                    setErrors({ ...errors, courseCategory: '' });
+                  }}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="general">通识课</option>
+                  <option value="professional_basic">专业基础课</option>
+                  <option value="professional_core">专业核心课</option>
+                  <option value="expansion">拓展课</option>
+                  <option value="elective_course">选修课</option>
+                </select>
+                {errors.courseCategory && (
+                  <p className="mt-1 text-sm text-red-500">{errors.courseCategory}</p>
+                )}
+              </div>
+
+              {/* 选课类型 */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  选课类型 <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center">
                     <input
                       type="radio"
                       value="required"
-                      checked={courseType === 'required'}
+                      checked={enrollmentType === 'required'}
                       onChange={(e) => {
-                        setCourseType(e.target.value as 'required');
-                        setErrors({ ...errors, courseType: '' });
+                        setEnrollmentType(e.target.value as any);
+                        setErrors({ ...errors, enrollmentType: '' });
                       }}
                       className="mr-2"
                     />
-                    <span>{t.teacher.courseManagement?.requiredCourse || '必修课'}</span>
+                    <span>必修课</span>
                   </label>
                   <label className="flex items-center">
                     <input
                       type="radio"
                       value="elective"
-                      checked={courseType === 'elective'}
+                      checked={enrollmentType === 'elective'}
                       onChange={(e) => {
-                        setCourseType(e.target.value as 'elective');
-                        setErrors({ ...errors, courseType: '' });
+                        setEnrollmentType(e.target.value as any);
+                        setErrors({ ...errors, enrollmentType: '' });
                       }}
                       className="mr-2"
                     />
-                    <span>{t.teacher.courseManagement?.electiveCourse || '选修课'}</span>
+                    <span>选修课</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="retake"
+                      checked={enrollmentType === 'retake'}
+                      onChange={(e) => {
+                        setEnrollmentType(e.target.value as any);
+                        setErrors({ ...errors, enrollmentType: '' });
+                      }}
+                      className="mr-2"
+                    />
+                    <span>重修课</span>
                   </label>
                 </div>
-                {errors.courseType && (
-                  <p className="mt-1 text-sm text-red-500">{errors.courseType}</p>
+                {errors.enrollmentType && (
+                  <p className="mt-1 text-sm text-red-500">{errors.enrollmentType}</p>
+                )}
+              </div>
+
+              {/* 课程学分 */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  课程学分 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={courseCredits || ''}
+                  onChange={(e) => {
+                    setCourseCredits(parseInt(e.target.value) || 0);
+                    setErrors({ ...errors, courseCredits: '' });
+                  }}
+                  min="1"
+                  max="10"
+                  placeholder="请输入课程学分"
+                  className={`w-full px-4 py-2 border rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                    errors.courseCredits ? 'border-red-500' : 'border-slate-300'
+                  }`}
+                />
+                {errors.courseCredits && (
+                  <p className="mt-1 text-sm text-red-500">{errors.courseCredits}</p>
                 )}
               </div>
 

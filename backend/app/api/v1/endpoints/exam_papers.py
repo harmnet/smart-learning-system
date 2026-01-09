@@ -5,6 +5,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import and_, func
 from pydantic import BaseModel
+import random
 
 from app.db.session import get_db
 from app.models.exam_paper import ExamPaper, ExamPaperQuestion
@@ -16,12 +17,13 @@ router = APIRouter()
 # ============= Schemas =============
 class ExamPaperCreate(BaseModel):
     paper_name: str
-    duration_minutes: int
-    min_submit_minutes: int
+    duration_minutes: Optional[int] = 0  # 可选字段，默认0（不限制）
+    min_submit_minutes: Optional[int] = 0  # 可选字段，默认0（不限制）
     composition_mode: str  # manual, auto
     total_score: float = 100.0
     question_order: str = "fixed"  # fixed, random
     option_order: str = "fixed"  # fixed, random
+    knowledge_point: str  # 关联的知识点名称（必填）
 
 class ExamPaperUpdate(BaseModel):
     paper_name: Optional[str] = None
@@ -31,6 +33,7 @@ class ExamPaperUpdate(BaseModel):
     total_score: Optional[float] = None
     question_order: Optional[str] = None
     option_order: Optional[str] = None
+    knowledge_point: Optional[str] = None
 
 class ExamPaperQuestionAdd(BaseModel):
     question_id: int
@@ -44,6 +47,21 @@ class AutoCompositionConfig(BaseModel):
     question_type: str
     count: int
     score_per_question: float
+
+class QuestionTypeConfig(BaseModel):
+    question_type: str  # single_choice, multiple_choice, true_false, etc.
+    count: int
+    score_per_question: float
+
+class AIAssembleConfig(BaseModel):
+    question_configs: List[QuestionTypeConfig]
+
+class AIAssembleQuestionItem(BaseModel):
+    question_id: int
+    score: float
+
+class AIAssembleConfirm(BaseModel):
+    questions: List[AIAssembleQuestionItem]
 
 # ============= API Endpoints =============
 @router.get("/")
@@ -91,6 +109,7 @@ async def get_exam_papers(
             "total_score": float(paper.total_score),
             "question_order": paper.question_order,
             "option_order": paper.option_order,
+            "knowledge_point": paper.knowledge_point,
             "question_count": question_count,
             "is_active": paper.is_active,
             "created_at": paper.created_at.isoformat() if paper.created_at else None,
@@ -175,6 +194,7 @@ async def get_exam_paper(
         "total_score": float(paper.total_score),
         "question_order": paper.question_order,
         "option_order": paper.option_order,
+        "knowledge_point": paper.knowledge_point,
         "questions": questions,
         "is_active": paper.is_active,
         "created_at": paper.created_at.isoformat() if paper.created_at else None,
@@ -197,6 +217,7 @@ async def create_exam_paper(
         total_score=paper_data.total_score,
         question_order=paper_data.question_order,
         option_order=paper_data.option_order,
+        knowledge_point=paper_data.knowledge_point,
         is_active=True
     )
     db.add(paper)
@@ -246,6 +267,8 @@ async def update_exam_paper(
         paper.question_order = paper_data.question_order
     if paper_data.option_order is not None:
         paper.option_order = paper_data.option_order
+    if paper_data.knowledge_point is not None:
+        paper.knowledge_point = paper_data.knowledge_point
     
     await db.commit()
     await db.refresh(paper)
@@ -434,6 +457,43 @@ async def update_paper_question(
         "score_match": abs(total_score - float(paper.total_score)) < 0.01
     }
 
+@router.delete("/{paper_id}/questions/clear")
+async def clear_all_questions(
+    paper_id: int,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """清空试卷所有试题"""
+    # 检查试卷
+    paper_result = await db.execute(
+        select(ExamPaper).where(
+            and_(
+                ExamPaper.id == paper_id,
+                ExamPaper.teacher_id == teacher_id,
+                ExamPaper.is_active == True
+            )
+        )
+    )
+    paper = paper_result.scalar_one_or_none()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    
+    # 删除所有试题关联
+    questions_result = await db.execute(
+        select(ExamPaperQuestion).where(
+            ExamPaperQuestion.exam_paper_id == paper_id
+        )
+    )
+    questions = questions_result.scalars().all()
+    
+    for question in questions:
+        await db.delete(question)
+    
+    await db.commit()
+    
+    return {"message": "试卷题目已全部清空"}
+
 @router.delete("/{paper_id}/questions/{epq_id}")
 async def remove_question_from_paper(
     paper_id: int,
@@ -570,5 +630,189 @@ async def auto_compose_paper(
         "message": "智能组卷成功",
         "added_questions": added_questions,
         "total_score": total_score
+    }
+
+@router.post("/{paper_id}/ai-assemble")
+async def ai_assemble_paper(
+    paper_id: int,
+    config: AIAssembleConfig,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """AI一键组卷：根据知识点和题型配置自动选择题目"""
+    # 检查试卷
+    paper_result = await db.execute(
+        select(ExamPaper).where(
+            and_(
+                ExamPaper.id == paper_id,
+                ExamPaper.teacher_id == teacher_id,
+                ExamPaper.is_active == True
+            )
+        )
+    )
+    paper = paper_result.scalar_one_or_none()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    
+    # 计算配置的总分
+    total_configured_score = sum(
+        cfg.count * cfg.score_per_question 
+        for cfg in config.question_configs
+    )
+    
+    # 验证总分不超标
+    if total_configured_score > float(paper.total_score):
+        raise HTTPException(
+            status_code=400,
+            detail=f"配置的总分({total_configured_score})超过试卷总分({paper.total_score})"
+        )
+    
+    # 获取试卷已有的题目ID列表
+    existing_questions_result = await db.execute(
+        select(ExamPaperQuestion.question_id).where(
+            ExamPaperQuestion.exam_paper_id == paper_id
+        )
+    )
+    existing_question_ids = set(existing_questions_result.scalars().all())
+    
+    # 为每种题型选择题目
+    selected_questions = []
+    for cfg in config.question_configs:
+        # 查询该知识点下该题型的所有可用题目(排除已添加的)
+        questions_result = await db.execute(
+            select(Question).where(
+                and_(
+                    Question.teacher_id == teacher_id,
+                    Question.knowledge_point == paper.knowledge_point,
+                    Question.question_type == cfg.question_type,
+                    Question.is_active == True,
+                    Question.id.notin_(existing_question_ids)
+                )
+            )
+        )
+        available_questions = list(questions_result.scalars().all())
+        
+        # 检查题目数量是否充足
+        if len(available_questions) < cfg.count:
+            raise HTTPException(
+                status_code=400,
+                detail=f"知识点'{paper.knowledge_point}'下'{cfg.question_type}'类型的题目数量不足(需要{cfg.count}道,可用{len(available_questions)}道)"
+            )
+        
+        # 随机选择指定数量的题目
+        selected = random.sample(available_questions, cfg.count)
+        for question in selected:
+            selected_questions.append({
+                "question": question,
+                "score": cfg.score_per_question
+            })
+    
+    # 返回选择的题目供前端预览
+    result_questions = []
+    for item in selected_questions:
+        question = item["question"]
+        # 获取选项(如果有)
+        options_result = await db.execute(
+            select(Question).options(selectinload(Question.options)).where(
+                Question.id == question.id
+            )
+        )
+        question_with_options = options_result.scalar_one_or_none()
+        
+        question_data = {
+            "id": question.id,
+            "question_type": question.question_type,
+            "title": question.title,
+            "title_image": question.title_image,
+            "knowledge_point": question.knowledge_point,
+            "answer": question.answer,
+            "explanation": question.explanation,
+            "difficulty": question.difficulty,
+            "score": item["score"],
+            "options": []
+        }
+        
+        if question_with_options and question_with_options.options:
+            question_data["options"] = [
+                {
+                    "id": opt.id,
+                    "option_text": opt.option_text,
+                    "option_image": opt.option_image,
+                    "is_correct": opt.is_correct,
+                }
+                for opt in question_with_options.options
+            ]
+        
+        result_questions.append(question_data)
+    
+    return {
+        "message": "AI组卷预览成功",
+        "questions": result_questions,
+        "total_score": total_configured_score
+    }
+
+@router.post("/{paper_id}/ai-assemble/confirm")
+async def confirm_ai_assemble(
+    paper_id: int,
+    confirm_data: AIAssembleConfirm,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """确认AI组卷结果并添加到试卷"""
+    # 检查试卷
+    paper_result = await db.execute(
+        select(ExamPaper).where(
+            and_(
+                ExamPaper.id == paper_id,
+                ExamPaper.teacher_id == teacher_id,
+                ExamPaper.is_active == True
+            )
+        )
+    )
+    paper = paper_result.scalar_one_or_none()
+    
+    if not paper:
+        raise HTTPException(status_code=404, detail="试卷不存在")
+    
+    # 获取当前最大的sort_order
+    max_sort_result = await db.execute(
+        select(func.max(ExamPaperQuestion.sort_order)).where(
+            ExamPaperQuestion.exam_paper_id == paper_id
+        )
+    )
+    max_sort = max_sort_result.scalar() or 0
+    sort_order = max_sort + 1
+    
+    added_count = 0
+    for item in confirm_data.questions:
+        # 检查题目是否已存在
+        existing_result = await db.execute(
+            select(ExamPaperQuestion).where(
+                and_(
+                    ExamPaperQuestion.exam_paper_id == paper_id,
+                    ExamPaperQuestion.question_id == item.question_id
+                )
+            )
+        )
+        if existing_result.scalar_one_or_none():
+            continue
+        
+        # 添加题目
+        epq = ExamPaperQuestion(
+            exam_paper_id=paper_id,
+            question_id=item.question_id,
+            score=item.score,
+            sort_order=sort_order
+        )
+        db.add(epq)
+        added_count += 1
+        sort_order += 1
+    
+    await db.commit()
+    
+    return {
+        "message": f"成功添加{added_count}道题目到试卷",
+        "added_count": added_count
     }
 

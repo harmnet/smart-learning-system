@@ -17,6 +17,7 @@ class Exam(Base):
     cover_image = Column(String, nullable=True)  # 考试封面
     early_login_minutes = Column(Integer, default=15)  # 提前登录时间（分钟）
     late_forbidden_minutes = Column(Integer, default=15)  # 迟到禁止登录时间（分钟）
+    minimum_submission_minutes = Column(Integer, default=15, nullable=False)  # 最早交卷时间（分钟）
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
@@ -33,6 +34,9 @@ class ExamStudent(Base):
     id = Column(Integer, primary_key=True, index=True)
     exam_id = Column(Integer, ForeignKey("exam.id"), nullable=False)
     student_id = Column(Integer, ForeignKey("student_profile.id"), nullable=False)
+    exam_status = Column(String(50), default='pending')  # pending, in_progress, submitted
+    start_time = Column(DateTime, nullable=True)  # 开始考试时间
+    submit_time = Column(DateTime, nullable=True)  # 提交考试时间
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

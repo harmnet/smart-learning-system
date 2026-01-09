@@ -99,6 +99,7 @@ async def get_study_duration(
 ) -> Any:
     """
     获取学生在某门课程的学习时长走势（最近N天）
+    从 student_learning_behavior 表聚合学习时长
     """
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="只有学生才能访问此资源")
@@ -107,17 +108,18 @@ async def get_study_duration(
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=days-1)
     
+    # 从 student_learning_behavior 表聚合学习时长（秒转为分钟）
     query = text("""
         SELECT 
-            DATE(study_date) as date,
-            SUM(duration_minutes) as total_minutes
-        FROM student_study_duration
+            DATE(created_at) as date,
+            ROUND(SUM(duration_seconds) / 60.0) as total_minutes
+        FROM student_learning_behavior
         WHERE student_id = :student_id 
             AND course_id = :course_id
-            AND DATE(study_date) >= :start_date
-            AND DATE(study_date) <= :end_date
-        GROUP BY DATE(study_date)
-        ORDER BY DATE(study_date)
+            AND DATE(created_at) >= :start_date
+            AND DATE(created_at) <= :end_date
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at)
     """)
     
     result = await db.execute(
@@ -134,7 +136,7 @@ async def get_study_duration(
     # 创建完整的日期序列，填充缺失的日期为0
     duration_data = []
     current_date = start_date
-    data_dict = {row[0]: row[1] for row in rows}
+    data_dict = {row[0]: int(row[1]) if row[1] else 0 for row in rows}
     
     while current_date <= end_date:
         duration_data.append({
@@ -154,27 +156,58 @@ async def get_exam_scores(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    获取学生在某门课程的测评成绩走势
+    获取学生在某门课程的测评成绩走势（包括传统考试和AI测评）
     """
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="只有学生才能访问此资源")
 
+    # 使用UNION合并传统考试成绩和AI测评成绩
     query = text("""
         SELECT 
-            ses.id,
-            ses.score,
-            ses.total_score,
-            ses.exam_date,
-            ses.is_submitted,
-            ep.paper_name as exam_paper_title,
-            e.exam_name as exam_name
-        FROM student_exam_score ses
-        LEFT JOIN exam_paper ep ON ses.exam_paper_id = ep.id
-        LEFT JOIN exam e ON ses.exam_id = e.id
-        WHERE ses.student_id = :student_id 
-            AND ses.course_id = :course_id
-            AND ses.is_submitted = TRUE
-        ORDER BY ses.exam_date DESC
+            id,
+            score,
+            total_score,
+            exam_date,
+            is_submitted,
+            exam_title,
+            exam_type
+        FROM (
+            -- 传统考试成绩
+            SELECT 
+                ses.id,
+                ses.score,
+                ses.total_score,
+                ses.exam_date,
+                ses.is_submitted,
+                COALESCE(e.exam_name, ep.paper_name, '未命名考试') as exam_title,
+                '考试' as exam_type
+            FROM student_exam_score ses
+            LEFT JOIN exam_paper ep ON ses.exam_paper_id = ep.id
+            LEFT JOIN exam e ON ses.exam_id = e.id
+            WHERE ses.student_id = :student_id 
+                AND ses.course_id = :course_id
+                AND ses.is_submitted = TRUE
+            
+            UNION ALL
+            
+            -- AI测评成绩
+            SELECT 
+                aqr.id,
+                aqr.score,
+                aqr.total_score,
+                aqr.submitted_at as exam_date,
+                aqr.is_submitted,
+                CONCAT('AI测评 - ', tr.resource_name) as exam_title,
+                'AI测评' as exam_type
+            FROM ai_quiz_record aqr
+            JOIN teaching_resource tr ON aqr.resource_id = tr.id
+            JOIN course_section_resource csr ON tr.id = csr.resource_id AND csr.resource_type = 'teaching_resource'
+            JOIN course_chapter cc ON csr.chapter_id = cc.id
+            WHERE aqr.student_id = :student_id 
+                AND cc.course_id = :course_id
+                AND aqr.is_submitted = TRUE
+        ) combined_scores
+        ORDER BY exam_date DESC
         LIMIT :limit
     """)
     
@@ -186,15 +219,18 @@ async def get_exam_scores(
     
     scores = []
     for row in rows:
+        score_val = float(row[1]) if row[1] is not None else 0
+        total_val = float(row[2]) if row[2] else 100
         scores.append({
             "id": row[0],
-            "score": float(row[1]) if row[1] else 0,
-            "total_score": float(row[2]) if row[2] else 100,
-            "percentage": round((float(row[1]) / float(row[2]) * 100) if row[2] else 0, 2),
+            "score": score_val,
+            "total_score": total_val,
+            "percentage": round((score_val / total_val * 100) if total_val > 0 else 0, 2),
             "exam_date": row[3].isoformat() if row[3] else None,
             "is_submitted": row[4],
             "exam_paper_title": row[5],
-            "exam_name": row[6]
+            "exam_name": row[5],  # 统一使用exam_title
+            "exam_type": row[6]  # 新增：考试类型
         })
     
     return scores

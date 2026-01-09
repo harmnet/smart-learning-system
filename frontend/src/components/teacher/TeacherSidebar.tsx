@@ -27,6 +27,7 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/knowledge-graphs', 
       label: t.nav.knowledgeGraph,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -36,25 +37,17 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/resources', 
       label: t.nav.teachingResources,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
       )
     },
-    // 参考资料功能已隐藏
-    // { 
-    //   href: '/teacher/references', 
-    //   label: t.nav.referenceMaterials,
-    //   icon: (
-    //     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    //     </svg>
-    //   )
-    // },
     { 
       href: '/teacher/questions', 
       label: t.nav.questionBank,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -64,6 +57,7 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/exams', 
       label: t.nav.examPaperBank,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -73,6 +67,7 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/exam-management', 
       label: t.nav.examManagement,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
@@ -82,6 +77,7 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/courses', 
       label: t.nav.courseManagement,
+      disabled: false,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -91,6 +87,8 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/homework', 
       label: t.nav.homeworkGrading,
+      disabled: true,
+      tooltip: '功能开发中',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -100,6 +98,8 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/qa', 
       label: t.nav.qaSupport,
+      disabled: true,
+      tooltip: '功能开发中',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -109,6 +109,8 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/analytics', 
       label: t.nav.learningAnalytics,
+      disabled: true,
+      tooltip: '功能开发中',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -118,6 +120,8 @@ export default function TeacherSidebar() {
     { 
       href: '/teacher/grades', 
       label: t.nav.gradeManagement,
+      disabled: true,
+      tooltip: '功能开发中',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -164,22 +168,33 @@ export default function TeacherSidebar() {
       <nav className="flex-1 overflow-y-auto px-3">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
-          return (
+          const buttonContent = (
             <button
               key={item.href}
-              onClick={() => router.push(item.href)}
+              onClick={() => !item.disabled && router.push(item.href)}
+              disabled={item.disabled}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 mb-1 rounded-xl text-sm font-medium transition-all
-                ${isActive 
-                  ? 'text-blue-600 bg-blue-50 shadow-sm' 
-                  : 'text-neutral-600 hover:text-blue-600 hover:bg-neutral-50'
+                ${item.disabled
+                  ? 'text-slate-300 bg-slate-50 cursor-not-allowed opacity-60'
+                  : isActive 
+                    ? 'text-blue-600 bg-blue-50 shadow-sm' 
+                    : 'text-neutral-600 hover:text-blue-600 hover:bg-neutral-50'
                 }
               `}
+              title={item.disabled ? item.tooltip : undefined}
             >
               {item.icon}
               <span>{item.label}</span>
+              {item.disabled && (
+                <span className="ml-auto text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                  开发中
+                </span>
+              )}
             </button>
           );
+          
+          return buttonContent;
         })}
       </nav>
     </aside>

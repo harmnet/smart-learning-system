@@ -13,6 +13,7 @@ export interface Exam {
   cover_image?: string;
   early_login_minutes: number;
   late_forbidden_minutes: number;
+  minimum_submission_minutes: number;
   status: 'not_started' | 'in_progress' | 'ended';
   student_count: number;
   is_active: boolean;
@@ -41,6 +42,7 @@ export interface ExamCreate {
   end_time: string; // YYYY-MM-DDTHH:mm:ss
   early_login_minutes: number;
   late_forbidden_minutes: number;
+  minimum_submission_minutes: number;
 }
 
 export interface ExamUpdate {
@@ -51,10 +53,27 @@ export interface ExamUpdate {
   end_time?: string;
   early_login_minutes?: number;
   late_forbidden_minutes?: number;
+  minimum_submission_minutes?: number;
 }
 
 export interface AddStudentsRequest {
   student_ids: number[];
+}
+
+export interface ExamStatistics {
+  exam_id: number;
+  exam_name: string;
+  exam_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  exam_paper_name: string | null;
+  total_students: number;
+  pending_count: number;
+  in_progress_count: number;
+  submitted_count: number;
+  early_login_minutes: number;
+  late_forbidden_minutes: number;
+  minimum_submission_minutes: number;
 }
 
 class ExamService {
@@ -166,13 +185,25 @@ class ExamService {
   }
 
   /**
+   * 获取考试统计信息
+   */
+  async getStatistics(examId: number, teacherId: number): Promise<ExamStatistics> {
+    const response = await apiClient.get<ExamStatistics>(
+      `/teacher/exams/${examId}/statistics?teacher_id=${teacherId}`
+    );
+    return response.data;
+  }
+
+  /**
    * 获取封面URL
    */
   getCoverUrl(coverImage?: string): string {
     if (!coverImage) return '';
     if (coverImage.startsWith('http')) return coverImage;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    return `${baseUrl}/${coverImage}`;
+    // 静态文件直接访问后端根路径，不需要 /api/v1 前缀
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const staticBaseUrl = apiBaseUrl.replace('/api/v1', '');
+    return `${staticBaseUrl}/${coverImage}`;
   }
 }
 

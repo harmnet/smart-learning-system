@@ -7,7 +7,9 @@ class CourseBase(BaseModel):
     code: Optional[str] = None
     description: Optional[str] = None
     credits: Optional[int] = None
-    course_type: Optional[str] = None  # required（必修课）、elective（选修课）
+    course_type: Optional[str] = None  # 保留字段，用于兼容
+    course_category: Optional[str] = None  # 课程类型：general、professional_basic、professional_core、expansion、elective_course
+    enrollment_type: Optional[str] = None  # 选课类型：required、elective、retake
     hours: Optional[int] = None  # 课程学时
     introduction: Optional[str] = None  # 课程简介
     objectives: Optional[str] = None  # 授课目标
@@ -23,7 +25,9 @@ class CourseUpdate(BaseModel):
     code: Optional[str] = None
     description: Optional[str] = None
     credits: Optional[int] = None
-    course_type: Optional[str] = None  # required（必修课）、elective（选修课）
+    course_type: Optional[str] = None  # 保留字段，用于兼容
+    course_category: Optional[str] = None  # 课程类型：general、professional_basic、professional_core、expansion、elective_course
+    enrollment_type: Optional[str] = None  # 选课类型：required、elective、retake
     hours: Optional[int] = None  # 课程学时
     introduction: Optional[str] = None  # 课程简介
     objectives: Optional[str] = None  # 授课目标

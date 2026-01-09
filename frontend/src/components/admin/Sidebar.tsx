@@ -111,23 +111,22 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 h-screen bg-white flex flex-col fixed left-0 top-0 z-50 border-r border-neutral-100">
-      {/* Welcome Message */}
-      <div className="h-16 flex items-center px-6 mb-6 mt-2">
-        <div className="flex items-center gap-3 text-neutral-900">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-blue-200 shadow-lg">
-            {userName.charAt(0).toUpperCase()}
+      {/* Logo - 点击跳转到Dashboard首页 */}
+      <Link 
+        href="/admin" 
+        className="flex items-center gap-3 px-6 py-6 hover:bg-gray-50 transition-colors cursor-pointer border-b border-neutral-100"
+      >
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+          <span className="text-white font-bold text-lg">S</span>
           </div>
           <div>
-            <div className="text-sm text-neutral-500 font-medium">
-              {language === 'zh' ? '欢迎' : 'Welcome'}
-            </div>
-            <div className="text-lg font-bold tracking-tight">{userName}</div>
-          </div>
+          <span className="text-xl font-bold tracking-tight text-slate-900">Smart Learning</span>
+          <div className="text-xs text-slate-500">管理控制台</div>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto mt-4">
         <div className="px-3 mb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">
           Menu
         </div>

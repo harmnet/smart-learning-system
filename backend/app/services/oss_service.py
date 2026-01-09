@@ -26,12 +26,13 @@ class OSSService:
             # 使用默认endpoint
             endpoint = f"https://oss-{settings.OSS_REGION}.aliyuncs.com"
         
-        # 创建Bucket实例
+        # 创建Bucket实例 (V4签名需要指定region)
         self.bucket = oss2.Bucket(
             auth,
             endpoint,
             settings.OSS_BUCKET_NAME,
-            connect_timeout=30
+            connect_timeout=30,
+            region=settings.OSS_REGION  # V4签名必须指定region
         )
         
         # 配置CNAME

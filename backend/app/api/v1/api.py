@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -17,11 +17,18 @@ api_router.include_router(questions.router, prefix="/teacher/questions", tags=["
 api_router.include_router(knowledge_graphs.router, prefix="/teacher/knowledge-graphs", tags=["knowledge-graphs"])
 api_router.include_router(exam_papers.router, prefix="/teacher/exam-papers", tags=["exam-papers"])
 api_router.include_router(exams.router, prefix="/teacher/exams", tags=["exams"])
+api_router.include_router(exam_students.router, prefix="/teacher", tags=["exam-students"])
 api_router.include_router(students.router, prefix="/student", tags=["students"])
 api_router.include_router(teachers.router, prefix="/teacher", tags=["teachers"])
-api_router.include_router(course_outline.router, prefix="/teacher", tags=["course-outline"])
+api_router.include_router(course_outline.router, prefix="/course-outline", tags=["course-outline"])
 api_router.include_router(llm_configs.router, prefix="/admin/llm-configs", tags=["llm-configs"])
+api_router.include_router(admin_dashboard.router, prefix="/admin/dashboard", tags=["admin-dashboard"])
 api_router.include_router(student_learning.router, prefix="/student/learning", tags=["student-learning"])
+api_router.include_router(student_home.router, prefix="/student/home", tags=["student-home"])
+api_router.include_router(student_exams.router, prefix="/student", tags=["student-exams"])
+api_router.include_router(student_interactions.router, prefix="/student", tags=["student-interactions"])
+api_router.include_router(learning_profile.router, prefix="/student/learning-profile", tags=["learning-profile"])
+api_router.include_router(personalized_learning.router, prefix="/student/personalized-learning", tags=["personalized-learning"])
 api_router.include_router(ai_creation.router, prefix="/teacher/ai-creation", tags=["ai-creation"])
 api_router.include_router(ppt_creation.router, prefix="/teacher/ppt-creation", tags=["ppt-creation"])
 

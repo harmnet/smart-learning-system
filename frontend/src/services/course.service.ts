@@ -14,9 +14,14 @@ export interface Course {
   code?: string;
   description?: string;
   credits?: number;
-  course_type?: string;
+  course_type?: string;  // 保留字段，用于兼容
+  course_category?: string;  // 课程类型：general、professional_basic、professional_core、expansion、elective_course
+  enrollment_type?: string;  // 选课类型：required、elective、retake
   hours?: number;
+  introduction?: string;  // 课程简介
+  objectives?: string;  // 授课目标
   is_public?: boolean;
+  is_deleted?: boolean;  // 逻辑删除标记
   major_id?: number;
   major_name?: string;
   cover_image?: string;
@@ -41,11 +46,13 @@ class CourseService {
     skip: number = 0,
     limit: number = 100,
     search?: string,
-    teacherId?: number
+    teacherId?: number,
+    includeDeleted: boolean = false
   ): Promise<Course[]> {
     const params: any = { skip, limit };
     if (search) params.search = search;
     if (teacherId) params.teacher_id = teacherId;
+    if (includeDeleted) params.include_deleted = includeDeleted;
     
     const response = await apiClient.get<Course[]>('/courses/', { params });
     return response.data;
@@ -68,6 +75,8 @@ class CourseService {
     description?: string;
     credits?: number;
     course_type?: string;
+    course_category?: string;
+    enrollment_type?: string;
     hours?: number;
     introduction?: string;
     objectives?: string;
@@ -93,6 +102,8 @@ class CourseService {
     description?: string;
     credits?: number;
     course_type?: string;
+    course_category?: string;
+    enrollment_type?: string;
     hours?: number;
     introduction?: string;
     objectives?: string;
@@ -107,6 +118,20 @@ class CourseService {
     }
     const response = await apiClient.put(`/courses/${id}`, courseData, { params });
     return response.data;
+  }
+
+  /**
+   * 删除课程（逻辑删除）
+   */
+  async delete(id: number): Promise<void> {
+    await apiClient.delete(`/courses/${id}`);
+  }
+
+  /**
+   * 恢复已删除的课程
+   */
+  async restore(id: number): Promise<void> {
+    await apiClient.put(`/courses/${id}/restore`);
   }
 
   /**

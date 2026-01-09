@@ -91,24 +91,31 @@ def get_resource_type_from_filename(filename: str) -> Optional[str]:
 
 @router.get("/stats")
 async def get_resources_stats(
+    teacher_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(lambda: None)  # TODO: 添加认证
 ) -> Any:
-    """获取教学资源统计"""
-    # 总数
+    """获取教学资源统计（仅当前教师的资源）"""
+    # 总数（仅当前教师）
     total_result = await db.execute(
-        select(func.count(TeachingResource.id)).where(TeachingResource.is_active == True)
+        select(func.count(TeachingResource.id)).where(
+            and_(
+                TeachingResource.is_active == True,
+                TeachingResource.teacher_id == teacher_id
+            )
+        )
     )
     total = total_result.scalar() or 0
     
-    # 按类型统计
+    # 按类型统计（仅当前教师）
     type_stats = {}
     for resource_type in RESOURCE_TYPES.keys():
         type_result = await db.execute(
             select(func.count(TeachingResource.id)).where(
                 and_(
                     TeachingResource.is_active == True,
-                    TeachingResource.resource_type == resource_type
+                    TeachingResource.resource_type == resource_type,
+                    TeachingResource.teacher_id == teacher_id
                 )
             )
         )
@@ -391,19 +398,21 @@ async def delete_resource(
 @router.get("/{resource_id}/download")
 async def download_resource(
     resource_id: int,
+    teacher_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """下载教学资源（支持OSS和本地文件）"""
+    """下载教学资源（支持OSS和本地文件）- 需要权限验证"""
     result = await db.execute(
         select(TeachingResource).where(
             TeachingResource.id == resource_id,
+            TeachingResource.teacher_id == teacher_id,
             TeachingResource.is_active == True
         )
     )
     resource = result.scalars().first()
     
     if not resource:
-        raise HTTPException(status_code=404, detail="资源不存在")
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
     
     # 如果是OSS文件，从OSS下载并返回
     if resource.file_path.startswith('http://') or resource.file_path.startswith('https://'):
@@ -473,19 +482,21 @@ async def download_resource(
 @router.get("/{resource_id}/pdf")
 async def get_pdf(
     resource_id: int,
+    teacher_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取PDF文件（转换后的PDF或原始PDF文件）"""
+    """获取PDF文件（转换后的PDF或原始PDF文件）- 需要权限验证"""
     result = await db.execute(
         select(TeachingResource).where(
             TeachingResource.id == resource_id,
+            TeachingResource.teacher_id == teacher_id,
             TeachingResource.is_active == True
         )
     )
     resource = result.scalars().first()
     
     if not resource:
-        raise HTTPException(status_code=404, detail="资源不存在")
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
     
     # 优先使用转换后的PDF（pdf_path）
     pdf_path_to_use = None
@@ -620,6 +631,7 @@ async def get_pdf(
 @router.get("/{resource_id}/weboffice-url")
 async def get_weboffice_preview_url(
     resource_id: int,
+    teacher_id: int,
     expires: int = Query(3600, description="URL有效期（秒），默认3600秒（1小时）"),
     allow_export: bool = Query(True, description="是否允许导出"),
     allow_print: bool = Query(True, description="是否允许打印"),
@@ -628,18 +640,19 @@ async def get_weboffice_preview_url(
 ) -> Any:
     """
     获取WebOffice在线预览URL
-    仅支持Word、Excel、PPT、PDF文件
+    仅支持Word、Excel、PPT、PDF文件 - 需要权限验证
     """
     result = await db.execute(
         select(TeachingResource).where(
             TeachingResource.id == resource_id,
+            TeachingResource.teacher_id == teacher_id,
             TeachingResource.is_active == True
         )
     )
     resource = result.scalars().first()
     
     if not resource:
-        raise HTTPException(status_code=404, detail="资源不存在")
+        raise HTTPException(status_code=404, detail="资源不存在或无权访问")
     
     # 检查资源类型是否支持WebOffice预览
     supported_types = ['word', 'excel', 'ppt', 'pdf']
@@ -708,14 +721,16 @@ async def get_weboffice_preview_url(
 @router.get("/{resource_id}/preview")
 async def preview_resource(
     resource_id: int,
+    teacher_id: int,
     request: Request,
     token: Optional[str] = Query(None, description="Authentication token (optional, for iframe/img/video tags)"),
     db: AsyncSession = Depends(get_db),
 ):
-    """预览教学资源（用于图片、PDF等）"""
+    """预览教学资源（用于图片、PDF等）- 需要权限验证"""
     result = await db.execute(
         select(TeachingResource).where(
             TeachingResource.id == resource_id,
+            TeachingResource.teacher_id == teacher_id,
             TeachingResource.is_active == True
         )
     )

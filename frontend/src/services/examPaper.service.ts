@@ -11,6 +11,7 @@ export interface ExamPaper {
   total_score: number;
   question_order: string; // fixed, random
   option_order: string; // fixed, random
+  knowledge_point: string; // 关联的知识点名称
   question_count?: number;
   is_active: boolean;
   created_at: string;
@@ -53,6 +54,7 @@ export interface ExamPaperCreate {
   total_score: number;
   question_order: string;
   option_order: string;
+  knowledge_point: string; // 关联的知识点名称(必填)
 }
 
 export interface ExamPaperUpdate {
@@ -63,6 +65,7 @@ export interface ExamPaperUpdate {
   total_score?: number;
   question_order?: string;
   option_order?: string;
+  knowledge_point?: string;
 }
 
 export interface ExamPaperQuestionAdd {
@@ -79,6 +82,31 @@ export interface AutoCompositionConfig {
   question_type: string;
   count: number;
   score_per_question: number;
+}
+
+export interface QuestionTypeConfig {
+  question_type: string;
+  count: number;
+  score_per_question: number;
+}
+
+export interface AIAssembleConfig {
+  question_configs: QuestionTypeConfig[];
+}
+
+export interface AIAssembleQuestionItem {
+  question_id: number;
+  score: number;
+}
+
+export interface AIAssembleConfirm {
+  questions: AIAssembleQuestionItem[];
+}
+
+export interface AIAssembleResult {
+  message: string;
+  questions: ExamPaperQuestion[];
+  total_score: number;
 }
 
 class ExamPaperService {
@@ -188,6 +216,46 @@ class ExamPaperService {
     const response = await apiClient.post(
       `/teacher/exam-papers/${paperId}/auto-compose?teacher_id=${teacherId}`,
       configs
+    );
+    return response.data;
+  }
+
+  /**
+   * 清空试卷所有试题
+   */
+  async clearAllQuestions(paperId: number, teacherId: number): Promise<any> {
+    const response = await apiClient.delete(
+      `/teacher/exam-papers/${paperId}/questions/clear?teacher_id=${teacherId}`
+    );
+    return response.data;
+  }
+
+  /**
+   * AI一键组卷(预览)
+   */
+  async aiAssemble(
+    paperId: number,
+    teacherId: number,
+    config: AIAssembleConfig
+  ): Promise<AIAssembleResult> {
+    const response = await apiClient.post<AIAssembleResult>(
+      `/teacher/exam-papers/${paperId}/ai-assemble?teacher_id=${teacherId}`,
+      config
+    );
+    return response.data;
+  }
+
+  /**
+   * 确认AI组卷结果并添加到试卷
+   */
+  async confirmAIAssemble(
+    paperId: number,
+    teacherId: number,
+    confirmData: AIAssembleConfirm
+  ): Promise<any> {
+    const response = await apiClient.post(
+      `/teacher/exam-papers/${paperId}/ai-assemble/confirm?teacher_id=${teacherId}`,
+      confirmData
     );
     return response.data;
   }

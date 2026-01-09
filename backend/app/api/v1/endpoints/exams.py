@@ -15,10 +15,12 @@ from app.models.exam import Exam, ExamStudent
 from app.models.exam_paper import ExamPaper
 from app.models.base import User
 from app.models.base import StudentProfile
+from app.services.oss_service import oss_service
+from app.core.config import settings
 
 router = APIRouter()
 
-# 考试封面上传目录
+# 考试封面上传目录（本地备用方案）
 COVER_UPLOAD_DIR = Path("uploads/exam_covers")
 COVER_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -31,6 +33,7 @@ class ExamCreate(BaseModel):
     end_time: str  # ISO格式日期时间字符串
     early_login_minutes: int = 15
     late_forbidden_minutes: int = 15
+    minimum_submission_minutes: int = 15  # 最早交卷时间（分钟）
 
 class ExamUpdate(BaseModel):
     exam_paper_id: Optional[int] = None
@@ -40,6 +43,7 @@ class ExamUpdate(BaseModel):
     end_time: Optional[str] = None
     early_login_minutes: Optional[int] = None
     late_forbidden_minutes: Optional[int] = None
+    minimum_submission_minutes: Optional[int] = None
 
 class AddStudentsRequest(BaseModel):
     student_ids: List[int]
@@ -185,6 +189,7 @@ async def get_exam(
         "cover_image": exam.cover_image,
         "early_login_minutes": exam.early_login_minutes,
         "late_forbidden_minutes": exam.late_forbidden_minutes,
+        "minimum_submission_minutes": exam.minimum_submission_minutes,
         "status": exam_status,
         "students": students,
         "is_active": exam.is_active,
@@ -236,6 +241,7 @@ async def create_exam(
         end_time=end_time,
         early_login_minutes=exam_data.early_login_minutes,
         late_forbidden_minutes=exam_data.late_forbidden_minutes,
+        minimum_submission_minutes=exam_data.minimum_submission_minutes,
         is_active=True
     )
     db.add(exam)
@@ -314,6 +320,9 @@ async def update_exam(
     if exam_data.late_forbidden_minutes is not None:
         exam.late_forbidden_minutes = exam_data.late_forbidden_minutes
     
+    if exam_data.minimum_submission_minutes is not None:
+        exam.minimum_submission_minutes = exam_data.minimum_submission_minutes
+    
     # 验证时间
     if exam.start_time >= exam.end_time:
         raise HTTPException(status_code=400, detail="开始时间必须早于结束时间")
@@ -359,63 +368,113 @@ async def upload_cover(
     teacher_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
-    """上传考试封面"""
-    # 检查考试是否存在
-    result = await db.execute(
-        select(Exam).where(
-            and_(
-                Exam.id == exam_id,
-                Exam.teacher_id == teacher_id,
-                Exam.is_active == True
+    """上传考试封面（优先OSS，降级到本地）"""
+    import traceback
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # 检查考试是否存在
+        result = await db.execute(
+            select(Exam).where(
+                and_(
+                    Exam.id == exam_id,
+                    Exam.teacher_id == teacher_id,
+                    Exam.is_active == True
+                )
             )
         )
-    )
-    exam = result.scalar_one_or_none()
-    
-    if not exam:
-        raise HTTPException(status_code=404, detail="考试不存在")
-    
-    # 检查文件类型
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="只能上传图片文件")
-    
-    # 检查文件大小（50MB）
-    file_content = await file.read()
-    file_size = len(file_content)
-    if file_size > 50 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件大小不能超过50MB")
-    
-    # 生成唯一文件名
-    file_ext = Path(file.filename).suffix.lower()
-    file_id = str(uuid.uuid4())
-    filename = f"{file_id}{file_ext}"
-    file_path = COVER_UPLOAD_DIR / filename
-    
-    # 保存文件
-    try:
-        with open(file_path, "wb") as f:
-            f.write(file_content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
-    
-    # 删除旧封面
-    if exam.cover_image:
-        old_path = Path(exam.cover_image)
-        if old_path.exists():
+        exam = result.scalar_one_or_none()
+        
+        if not exam:
+            raise HTTPException(status_code=404, detail="考试不存在")
+        
+        # 检查文件类型
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="只能上传图片文件")
+        
+        # 检查文件大小（50MB）
+        file_content = await file.read()
+        file_size = len(file_content)
+        if file_size > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="文件大小不能超过50MB")
+        
+        # 生成文件名
+        file_ext = Path(file.filename).suffix.lower()
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        file_id = str(uuid.uuid4())[:8]
+        filename = f"{timestamp}_{file_id}{file_ext}"
+        
+        # 尝试上传到OSS
+        use_oss = False
+        if oss_service and settings.OSS_ACCESS_KEY_ID and settings.OSS_ACCESS_KEY_SECRET:
             try:
-                old_path.unlink()
-            except:
-                pass
-    
-    # 更新数据库
-    exam.cover_image = str(file_path)
-    await db.commit()
-    await db.refresh(exam)
-    
-    return {
-        "message": "封面上传成功",
-        "cover_image": exam.cover_image
-    }
+                object_name = f"exam_covers/{teacher_id}/{filename}"
+                upload_result = oss_service.upload_file(
+                    file_content=file_content,
+                    object_name=object_name,
+                    content_type=file.content_type
+                )
+                
+                if upload_result.get("success"):
+                    file_url = upload_result["file_url"]
+                    use_oss = True
+                    logger.info(f"封面上传到OSS成功: {object_name}")
+                    
+                    # 删除旧封面（如果存在且是OSS文件）
+                    if exam.cover_image and "exam_covers/" in exam.cover_image:
+                        try:
+                            old_object_name = exam.cover_image.split(".com/")[-1] if ".com/" in exam.cover_image else exam.cover_image.split("/exam_covers/")[-1]
+                            if old_object_name.startswith("exam_covers/"):
+                                oss_service.delete_file(old_object_name)
+                        except Exception as e:
+                            logger.warning(f"删除旧OSS封面失败: {str(e)}")
+                else:
+                    logger.warning(f"OSS上传失败: {upload_result.get('error')}, 降级到本地存储")
+            except Exception as e:
+                logger.warning(f"OSS上传异常: {str(e)}, 降级到本地存储")
+        else:
+            logger.info("OSS未配置，使用本地存储")
+        
+        # 如果OSS上传失败或未配置，则保存到本地
+        if not use_oss:
+            file_path = COVER_UPLOAD_DIR / filename
+            try:
+                with open(file_path, "wb") as f:
+                    f.write(file_content)
+                # 使用相对路径，便于前端访问
+                file_url = f"uploads/exam_covers/{filename}"
+                logger.info(f"封面保存到本地: {file_url}")
+                
+                # 删除旧封面（如果存在且是本地文件）
+                if exam.cover_image and not exam.cover_image.startswith("http"):
+                    old_path = Path(exam.cover_image)
+                    if old_path.exists():
+                        try:
+                            old_path.unlink()
+                        except Exception as e:
+                            logger.warning(f"删除旧本地封面失败: {str(e)}")
+            except Exception as e:
+                logger.error(f"本地保存失败: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
+        
+        # 更新数据库
+        exam.cover_image = file_url
+        await db.commit()
+        await db.refresh(exam)
+        
+        return {
+            "message": "封面上传成功",
+            "cover_image": exam.cover_image,
+            "storage_type": "oss" if use_oss else "local"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传封面失败: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
 
 # ============= 考生管理 =============
 @router.post("/{exam_id}/students")
@@ -553,5 +612,64 @@ async def export_grades(
         "message": "成绩导出功能开发中",
         "exam_id": exam_id,
         "exam_name": exam.exam_name
+    }
+
+
+@router.get("/{exam_id}/statistics")
+async def get_exam_statistics(
+    exam_id: int,
+    teacher_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    获取考试实时统计信息
+    """
+    # 验证考试是否属于该教师
+    result = await db.execute(
+        select(Exam).options(
+            selectinload(Exam.exam_paper),
+            selectinload(Exam.exam_students).selectinload(ExamStudent.student)
+        ).where(
+            and_(
+                Exam.id == exam_id,
+                Exam.teacher_id == teacher_id,
+                Exam.is_active == True
+            )
+        )
+    )
+    exam = result.scalar_one_or_none()
+    
+    if not exam:
+        raise HTTPException(status_code=404, detail="考试不存在")
+    
+    # 统计考生状态
+    pending_count = 0  # 待考试
+    in_progress_count = 0  # 考试中
+    submitted_count = 0  # 已提交
+    
+    for exam_student in exam.exam_students:
+        if exam_student.exam_status == 'pending':
+            pending_count += 1
+        elif exam_student.exam_status == 'in_progress':
+            in_progress_count += 1
+        elif exam_student.exam_status == 'submitted':
+            submitted_count += 1
+    
+    total_students = len(exam.exam_students)
+    
+    return {
+        "exam_id": exam.id,
+        "exam_name": exam.exam_name,
+        "exam_date": exam.exam_date.isoformat() if exam.exam_date else None,
+        "start_time": exam.start_time.isoformat() if exam.start_time else None,
+        "end_time": exam.end_time.isoformat() if exam.end_time else None,
+        "exam_paper_name": exam.exam_paper.paper_name if exam.exam_paper else None,
+        "total_students": total_students,
+        "pending_count": pending_count,
+        "in_progress_count": in_progress_count,
+        "submitted_count": submitted_count,
+        "early_login_minutes": exam.early_login_minutes,
+        "late_forbidden_minutes": exam.late_forbidden_minutes,
+        "minimum_submission_minutes": exam.minimum_submission_minutes,
     }
 

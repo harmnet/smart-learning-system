@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.exceptions import RequestValidationError
 from pathlib import Path
 import logging
 import traceback
@@ -18,8 +19,24 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    debug=True
+    debug=True,
+    default_response_class=ORJSONResponse  # 使用orjson，它默认不转义Unicode字符
 )
+
+# 422 验证错误处理
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"❌ [VALIDATION ERROR] 请求验证失败!")
+    logger.error(f"📍 [REQUEST] Method: {request.method}, URL: {request.url}")
+    logger.error(f"🔍 [ERRORS] {exc.errors()}")
+    logger.error(f"📦 [BODY] {exc.body}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": str(exc.body) if exc.body else None
+        }
+    )
 
 # 全局异常处理
 @app.exception_handler(Exception)
@@ -37,6 +54,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 uploads_dir = Path("uploads/covers")
 uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads/covers", StaticFiles(directory=str(uploads_dir)), name="covers")
+
+# 挂载考试封面目录
+exam_covers_dir = Path("uploads/exam_covers")
+exam_covers_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/exam_covers", StaticFiles(directory=str(exam_covers_dir)), name="exam_covers")
 
 # Set all CORS enabled origins
 app.add_middleware(

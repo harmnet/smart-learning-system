@@ -934,3 +934,67 @@ async def get_node_resources_recursive(
         "knowledge_points": knowledge_points
     }
 
+@router.get("/{graph_id}/child-nodes")
+async def get_child_nodes(
+    graph_id: int,
+    parent_id: Optional[int] = None,
+    teacher_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    获取知识图谱的直接子节点
+    - 如果parent_id为None，返回根节点
+    - 如果parent_id有值，返回该节点的直接子节点
+    """
+    # 验证图谱存在
+    graph_query = select(KnowledgeGraph).where(KnowledgeGraph.id == graph_id)
+    if teacher_id:
+        graph_query = graph_query.where(KnowledgeGraph.teacher_id == teacher_id)
+    
+    graph_result = await db.execute(graph_query)
+    graph = graph_result.scalars().first()
+    
+    if not graph:
+        raise HTTPException(status_code=404, detail="Knowledge graph not found")
+    
+    # 如果指定了parent_id，验证父节点存在
+    if parent_id is not None:
+        parent_result = await db.execute(
+            select(KnowledgeNode).where(
+                and_(
+                    KnowledgeNode.id == parent_id,
+                    KnowledgeNode.graph_id == graph_id
+                )
+            )
+        )
+        parent_node = parent_result.scalars().first()
+        if not parent_node:
+            raise HTTPException(status_code=404, detail="Parent node not found")
+    
+    # 获取直接子节点
+    nodes_result = await db.execute(
+        select(KnowledgeNode).where(
+            and_(
+                KnowledgeNode.graph_id == graph_id,
+                KnowledgeNode.parent_id == parent_id,
+                KnowledgeNode.is_active == True
+            )
+        ).order_by(KnowledgeNode.sort_order)
+    )
+    nodes = nodes_result.scalars().all()
+    
+    return {
+        "graph_id": graph_id,
+        "parent_id": parent_id,
+        "nodes": [
+            {
+                "id": node.id,
+                "node_name": node.node_name,
+                "node_content": node.node_content,
+                "sort_order": node.sort_order,
+                "has_children": bool(node.children) if hasattr(node, 'children') else False
+            }
+            for node in nodes
+        ]
+    }
+
