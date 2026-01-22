@@ -1,0 +1,57 @@
+FROM node:18-alpine AS deps
+
+WORKDIR /app
+
+# 安装依赖（本地构建使用默认源）
+RUN apk add --no-cache libc6-compat
+
+# 安装npm依赖
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# 构建阶段
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 复制依赖
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# 接受构建参数
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Next.js 收集匿名遥测数据，禁用它
+ENV NEXT_TELEMETRY_DISABLED 1
+
+# 构建应用
+RUN npm run build
+
+# 生产镜像
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV production
+
+# 创建用户
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# 复制构建产物
+COPY --from=builder /app/next.config.js ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# 修改文件所有者
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+
+CMD ["node", "server.js"]

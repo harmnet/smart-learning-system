@@ -16,6 +16,7 @@ from app.models.knowledge_graph import KnowledgeGraph, KnowledgeNode
 from app.models.llm_config import LLMConfig
 from app.models.teaching_resource import TeachingResource
 from app.utils.pdf_extractor import pdf_extractor
+from app.utils.llm_call_logger import log_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -613,21 +614,42 @@ async def ai_generate_graph_from_pdf(
 5. 节点层级建议控制在3-4层以内
 6. 每个节点都应该有明确的父子关系"""
     
+    # 记录LLM调用
+    response_text = None
+    graph_id_for_log = None
     try:
-        # 调用LLM API
-        provider_key = config.provider_key
-        
-        if provider_key == "aliyun_qwen":
-            response_text = await _call_aliyun_qwen(config, prompt)
-        elif provider_key in ["deepseek", "kimi", "volcengine_doubao", "siliconflow"]:
-            response_text = await _call_openai_compatible(config, prompt)
-        elif provider_key == "wenxin":
-            response_text = await _call_wenxin(config, prompt)
-        else:
-            return AIGenerateGraphResponse(
-                success=False,
-                error=f"不支持的LLM提供商: {provider_key}"
-            )
+        async with log_llm_call(
+            db=db,
+            function_type="ai_generate_knowledge_graph",
+            user_id=teacher_id,
+            user_role="teacher",
+            llm_config_id=config.id,
+            prompt=prompt,
+            related_type="knowledge_graph"
+        ) as log_context:
+            try:
+                # 调用LLM API
+                provider_key = config.provider_key
+                
+                if provider_key == "aliyun_qwen":
+                    response_text = await _call_aliyun_qwen(config, prompt)
+                elif provider_key in ["deepseek", "kimi", "volcengine_doubao", "siliconflow"]:
+                    response_text = await _call_openai_compatible(config, prompt)
+                elif provider_key == "wenxin":
+                    response_text = await _call_wenxin(config, prompt)
+                else:
+                    error_msg = f"不支持的LLM提供商: {provider_key}"
+                    log_context.set_result(None, status='failed', error_message=error_msg)
+                    return AIGenerateGraphResponse(
+                        success=False,
+                        error=error_msg
+                    )
+                
+                log_context.set_result(response_text, status='success')
+            except Exception as e:
+                logger.error(f"LLM调用失败: {e}", exc_info=True)
+                log_context.set_result(None, status='failed', error_message=str(e))
+                raise
         
         # 解析返回的JSON
         response_text = response_text.strip()
@@ -662,6 +684,7 @@ async def ai_generate_graph_from_pdf(
         db.add(graph)
         await db.commit()
         await db.refresh(graph)
+        graph_id_for_log = graph.id
         
         # 创建节点（递归创建）
         nodes_data = graph_data.get("nodes", [])

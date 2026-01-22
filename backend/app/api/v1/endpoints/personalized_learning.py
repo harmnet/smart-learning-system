@@ -38,6 +38,7 @@ from app.schemas.personalized_learning import (
 from app.api.v1.endpoints.students import get_current_user
 from app.api.v1.endpoints.ai_creation import call_openai_compatible, call_aliyun_qwen
 from app.utils.resource_parser import download_and_parse_resource
+from app.utils.llm_call_logger import log_llm_call
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -160,10 +161,27 @@ async def generate_personalized_content(
         
         # 6. 调用LLM生成个性化内容
         logger.info("调用LLM生成个性化内容")
-        if llm_config.provider_key == "aliyun_qwen":
-            ai_content = await call_aliyun_qwen(llm_config, prompt)
-        else:
-            ai_content = await call_openai_compatible(llm_config, prompt)
+        ai_content = None
+        async with log_llm_call(
+            db=db,
+            function_type="personalized_learning",
+            user_id=current_user.id,
+            user_role=current_user.role,
+            llm_config_id=llm_config.id,
+            prompt=prompt,
+            related_id=request.resource_id,
+            related_type="teaching_resource"
+        ) as log_context:
+            try:
+                if llm_config.provider_key == "aliyun_qwen":
+                    ai_content = await call_aliyun_qwen(llm_config, prompt)
+                else:
+                    ai_content = await call_openai_compatible(llm_config, prompt)
+                log_context.set_result(ai_content, status='success')
+            except Exception as e:
+                logger.error(f"LLM调用失败: {str(e)}", exc_info=True)
+                log_context.set_result(None, status='failed', error_message=str(e))
+                raise
         
         # 7. 保存到数据库
         new_content = PersonalizedLearningContent(
@@ -408,10 +426,27 @@ async def generate_ai_quiz(
         
         # 7. 调用LLM生成题目
         logger.info("调用LLM生成测评题目")
-        if llm_config.provider_key == "aliyun_qwen":
-            ai_response = await call_aliyun_qwen(llm_config, prompt)
-        else:
-            ai_response = await call_openai_compatible(llm_config, prompt)
+        ai_response = None
+        async with log_llm_call(
+            db=db,
+            function_type="ai_quiz",
+            user_id=current_user.id,
+            user_role=current_user.role,
+            llm_config_id=llm_config.id,
+            prompt=prompt,
+            related_id=request.resource_id,
+            related_type="teaching_resource"
+        ) as log_context:
+            try:
+                if llm_config.provider_key == "aliyun_qwen":
+                    ai_response = await call_aliyun_qwen(llm_config, prompt)
+                else:
+                    ai_response = await call_openai_compatible(llm_config, prompt)
+                log_context.set_result(ai_response, status='success')
+            except Exception as e:
+                logger.error(f"LLM调用失败: {str(e)}", exc_info=True)
+                log_context.set_result(None, status='failed', error_message=str(e))
+                raise
         
         # 8. 解析JSON格式的题目
         questions = parse_quiz_questions(ai_response)

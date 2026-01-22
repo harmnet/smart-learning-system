@@ -185,6 +185,10 @@ class TeachingResourceService {
     preview_type: string;
     resource_type: string;
     file_name?: string;
+    access_token?: string;
+    refresh_token?: string;
+    access_token_expired_time?: string;
+    refresh_token_expired_time?: string;
   }> {
     try {
       const response = await apiClient.get(`/teacher/resources/${resourceId}/preview`, {
@@ -198,7 +202,11 @@ class TeachingResourceService {
           download_url: response.data.download_url || response.data.preview_url,
           preview_type: response.data.preview_type || 'download',
           resource_type: response.data.resource_type || 'unknown',
-          file_name: response.data.file_name
+          file_name: response.data.file_name,
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token,
+          access_token_expired_time: response.data.access_token_expired_time,
+          refresh_token_expired_time: response.data.refresh_token_expired_time,
         };
       }
       // 如果返回的是重定向或其他格式，说明不是Office文档

@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import ResourcePreviewModal from '@/components/teacher/ResourcePreviewModal';
+import DocumentPreview, { PreviewInfo } from '@/components/common/DocumentPreview';
+import { teachingResourceService } from '@/services/teachingResource.service';
 import PersonalizedContentModal from '@/components/student/PersonalizedContentModal';
 import AIQuizModal from '@/components/student/AIQuizModal';
+import StudentHomeworkModal from '@/components/student/StudentHomeworkModal';
+import { HomeworkItem } from '@/types/homework';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import apiClient from '@/lib/api-client';
 
@@ -46,7 +49,7 @@ interface CourseSection {
   sort_order: number;
   resources: CourseResource[];
   exam_papers: any[];
-  homework: any[];
+  homework: HomeworkItem[];
 }
 
 interface CourseChapter {
@@ -98,11 +101,14 @@ export default function StudentCoursePage() {
   const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [previewResource, setPreviewResource] = useState<CourseResource | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<PreviewInfo | null>(null);
+  const [previewResourceName, setPreviewResourceName] = useState<string>('');
   const [showPersonalizedModal, setShowPersonalizedModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [selectedResource, setSelectedResource] = useState<CourseResource | null>(null);
   const [activeTab, setActiveTab] = useState<'outline' | 'behaviors' | 'duration' | 'scores'>('outline');
+  const [showHomeworkModal, setShowHomeworkModal] = useState(false);
+  const [selectedHomeworkId, setSelectedHomeworkId] = useState<number | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -186,36 +192,46 @@ export default function StudentCoursePage() {
     });
   };
 
-  const handleResourceClick = (resource: CourseResource) => {
-    // 将CourseResource转换为ResourcePreviewModal期望的格式
-    // 后端已经返回了完整的资源信息，包括teacher_id和resource_type
-    const previewResource: any = {
-      id: resource.id,
-      teacher_id: resource.teacher_id || 1,  // 后端应该返回teacher_id
-      resource_name: resource.resource_name || resource.name,
-      resource_type: resource.resource_type || resource.type || resource.file_type,  // 确保resource_type正确
-      original_filename: resource.original_filename || resource.name,
-      file_type: resource.file_type || resource.resource_type || resource.type,
-      file_size: resource.file_size || 0
-    };
-    
-    // 确保resource_type是小写，与ResourcePreviewModal的检查逻辑一致
-    if (previewResource.resource_type) {
-      previewResource.resource_type = previewResource.resource_type.toLowerCase();
+  const handleResourceClick = async (resource: CourseResource) => {
+    try {
+      // 设置资源名称
+      setPreviewResourceName(resource.resource_name || resource.name);
+      
+      // 获取预览信息
+      const previewInfo = await teachingResourceService.getOfficePreviewUrl(resource.id);
+      
+      // 转换为PreviewInfo格式（包含access_token等字段）
+      const fullPreviewInfo: PreviewInfo = {
+        preview_url: previewInfo.preview_url,
+        download_url: previewInfo.download_url,
+        preview_type: previewInfo.preview_type as 'weboffice' | 'pdf' | 'download' | 'direct',
+        resource_type: previewInfo.resource_type,
+        file_name: previewInfo.file_name,
+        // 如果后端返回了token信息，也包含进来
+        ...(previewInfo as any).access_token && {
+          access_token: (previewInfo as any).access_token,
+          refresh_token: (previewInfo as any).refresh_token,
+          access_token_expired_time: (previewInfo as any).access_token_expired_time,
+          refresh_token_expired_time: (previewInfo as any).refresh_token_expired_time,
+        }
+      };
+      
+      setPreviewInfo(fullPreviewInfo);
+      setShowPreviewModal(true);
+      
+      // 记录学习行为
+      recordBehavior({
+        chapter_id: null,
+        resource_id: resource.id,
+        resource_type: resource.type,
+        behavior_type: 'view_resource',
+        description: `查看资源: ${resource.name}`,
+        duration_seconds: 0
+      });
+    } catch (error: any) {
+      console.error('获取预览信息失败:', error);
+      alert('获取预览信息失败: ' + (error.message || '未知错误'));
     }
-    
-    setPreviewResource(previewResource);
-    setShowPreviewModal(true);
-    
-    // 记录学习行为
-    recordBehavior({
-      chapter_id: null,
-      resource_id: resource.id,
-      resource_type: resource.type,
-      behavior_type: 'view_resource',
-      description: `查看资源: ${resource.name}`,
-      duration_seconds: 0
-    });
   };
 
   const recordBehavior = async (behaviorData: any) => {
@@ -705,6 +721,68 @@ export default function StudentCoursePage() {
                                         ) : (
                                           <p className="text-sm text-slate-500 p-3 text-center">该小节暂无资源</p>
                                         )}
+
+                                        {/* 课后作业列表 */}
+                                        {section.homework && section.homework.length > 0 && (
+                                          <div className="mt-4 pt-4 border-t border-violet-100/50">
+                                            <h5 className="flex items-center gap-2 text-sm font-semibold text-violet-700 mb-3">
+                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                              </svg>
+                                              课后作业
+                                            </h5>
+                                            <div className="space-y-2">
+                                              {section.homework.map((hw) => (
+                                                <div
+                                                  key={hw.id}
+                                                  className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-violet-50/70 to-fuchsia-50/70 border border-violet-100/50 hover:shadow-md transition-all duration-300"
+                                                >
+                                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-md">
+                                                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                      </svg>
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                      <p className="text-sm font-medium text-slate-800 truncate">{hw.title}</p>
+                                                      <div className="flex items-center gap-2 mt-1">
+                                                        {hw.deadline && (
+                                                          <span className={`text-xs ${new Date(hw.deadline) < new Date() ? 'text-red-500' : 'text-gray-500'}`}>
+                                                            截止: {new Date(hw.deadline).toLocaleDateString('zh-CN')}
+                                                          </span>
+                                                        )}
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                          hw.submission_status === 'graded' ? 'bg-green-100 text-green-700' :
+                                                          hw.submission_status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                                                          hw.submission_status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
+                                                          'bg-gray-100 text-gray-600'
+                                                        }`}>
+                                                          {hw.submission_status === 'graded' ? `已批改 ${hw.score !== null ? hw.score + '分' : ''}` :
+                                                           hw.submission_status === 'submitted' ? '已提交' :
+                                                           hw.submission_status === 'draft' ? '草稿' : '未开始'}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  <button
+                                                    onClick={() => {
+                                                      setSelectedHomeworkId(hw.id);
+                                                      setShowHomeworkModal(true);
+                                                    }}
+                                                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                      hw.submission_status === 'not_started' || hw.submission_status === 'draft'
+                                                        ? 'bg-violet-500 text-white hover:bg-violet-600'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                  >
+                                                    {hw.submission_status === 'not_started' ? '开始作业' :
+                                                     hw.submission_status === 'draft' ? '继续完成' : '查看详情'}
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -863,12 +941,15 @@ export default function StudentCoursePage() {
         </div>
       </main>
 
-      {previewResource && (
-        <ResourcePreviewModal
+      {previewInfo && (
+        <DocumentPreview
           isOpen={showPreviewModal}
-          onClose={() => setShowPreviewModal(false)}
-          resource={previewResource}
-          previewUrl={previewResource?.file_url || previewResource?.file_path || ''}
+          onClose={() => {
+            setShowPreviewModal(false);
+            setPreviewInfo(null);
+          }}
+          previewInfo={previewInfo}
+          resourceName={previewResourceName}
         />
       )}
 
@@ -897,6 +978,20 @@ export default function StudentCoursePage() {
           resourceName={selectedResource.resource_name || selectedResource.name}
         />
       )}
+
+      {/* 作业详情Modal */}
+      <StudentHomeworkModal
+        isOpen={showHomeworkModal}
+        onClose={() => {
+          setShowHomeworkModal(false);
+          setSelectedHomeworkId(null);
+        }}
+        homeworkId={selectedHomeworkId}
+        onSubmitSuccess={() => {
+          // 提交成功后刷新数据
+          loadData();
+        }}
+      />
     </div>
   );
 }

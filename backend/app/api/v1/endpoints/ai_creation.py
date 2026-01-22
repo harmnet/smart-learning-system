@@ -415,40 +415,55 @@ async def ai_generate_content(
         
         # 5. 调用LLM API
         provider_key = config.provider_key
+        content = None
         
-        try:
-            if provider_key == "aliyun_qwen":
-                content = await call_aliyun_qwen(config, prompt)
-            elif provider_key in ["deepseek", "kimi", "volcengine_doubao", "siliconflow"]:
-                content = await call_openai_compatible(config, prompt)
-            elif provider_key == "wenxin":
-                content = await call_wenxin(config, prompt)
-            else:
+        async with log_llm_call(
+            db=db,
+            function_type="ai_create_resource",
+            user_id=teacher_id,
+            user_role="teacher",
+            llm_config_id=config.id,
+            prompt=prompt,
+            related_id=graph_id,
+            related_type="knowledge_graph"
+        ) as log_context:
+            try:
+                if provider_key == "aliyun_qwen":
+                    content = await call_aliyun_qwen(config, prompt)
+                elif provider_key in ["deepseek", "kimi", "volcengine_doubao", "siliconflow"]:
+                    content = await call_openai_compatible(config, prompt)
+                elif provider_key == "wenxin":
+                    content = await call_wenxin(config, prompt)
+                else:
+                    error_msg = f"不支持的LLM提供商: {provider_key}"
+                    log_context.set_result(None, status='failed', error_message=error_msg)
+                    return GenerateResponse(
+                        success=False,
+                        error=error_msg
+                    )
+                
+                log_context.set_result(content, status='success')
+            except Exception as e:
+                logger.error(f"LLM API调用失败: {str(e)}")
+                log_context.set_result(None, status='failed', error_message=str(e))
                 return GenerateResponse(
                     success=False,
-                    error=f"不支持的LLM提供商: {provider_key}"
+                    error=f"AI生成失败: {str(e)}"
                 )
-            
-            # 清理内容（去除可能的markdown代码块标记）
-            content = content.strip()
-            if content.startswith('```markdown'):
-                content = content[11:].strip()
-            elif content.startswith('```'):
-                content = content[3:].strip()
-            if content.endswith('```'):
-                content = content[:-3].strip()
-            
-            return GenerateResponse(
-                success=True,
-                content=content
-            )
         
-        except Exception as e:
-            logger.error(f"LLM API调用失败: {str(e)}")
-            return GenerateResponse(
-                success=False,
-                error=f"AI生成失败: {str(e)}"
-            )
+        # 清理内容（去除可能的markdown代码块标记）
+        content = content.strip()
+        if content.startswith('```markdown'):
+            content = content[11:].strip()
+        elif content.startswith('```'):
+            content = content[3:].strip()
+        if content.endswith('```'):
+            content = content[:-3].strip()
+        
+        return GenerateResponse(
+            success=True,
+            content=content
+        )
     
     except Exception as e:
         logger.error(f"AI生成内容失败: {str(e)}")

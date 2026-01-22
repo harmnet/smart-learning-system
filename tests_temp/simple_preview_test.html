@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>预览测试</title>
+    <style>
+        body { padding: 20px; font-family: Arial; }
+        button { padding: 10px 20px; margin: 10px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; }
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; width: 95vw; height: 95vh; display: flex; flex-direction: column; border-radius: 10px; }
+        .modal-header { padding: 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; }
+        .modal-body { flex: 1; overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: 0; }
+    </style>
+</head>
+<body>
+    <h1>预览功能测试</h1>
+    <button onclick="testDirect()">方式1: 直接打开URL</button>
+    <button onclick="testIframe()">方式2: iframe嵌入</button>
+    
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>文档预览</h3>
+                <button onclick="closeModal()">关闭</button>
+            </div>
+            <div class="modal-body">
+                <iframe id="previewFrame" src=""></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PREVIEW_URL = 'https://smarteduonline.cn/homework/9ad323d8-11b5-4444-866f-f06a4372cf53.xlsx?x-oss-process=doc%2Fpreview%2Cexport_1%2Cprint_1&OSSAccessKeyId=LTAI5tMVdYzk5fVrmjQVk1Ga&Expires=1768967451&Signature=i1uQEZCaM9CaArMyGxOIZAv3po8%3D';
+        
+        function testDirect() {
+            window.open(PREVIEW_URL, '_blank');
+        }
+        
+        function testIframe() {
+            document.getElementById('previewFrame').src = PREVIEW_URL;
+            document.getElementById('modal').classList.add('show');
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+            document.getElementById('previewFrame').src = '';
+        }
+        
+        // 点击背景关闭
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+</body>
+</html>

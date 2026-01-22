@@ -45,6 +45,7 @@ export default function ExamManagementPage() {
   
   // 获取教师ID
   const getTeacherId = (): number | null => {
+    if (typeof window === 'undefined') return null;
     const teacherIdStr = localStorage.getItem('teacher_id') || localStorage.getItem('user_id');
     return teacherIdStr ? parseInt(teacherIdStr) : null;
   };

@@ -10,6 +10,10 @@ from sqlalchemy import text
 from app.db.session import get_db
 from app.core.config import settings
 from app.models.base import Course, ClassCourseRelation, StudentProfile, User, CourseCover, Class, TeacherProfile
+from app.models.course_outline import CourseSectionHomework, HomeworkAttachment
+from app.models.student_learning import StudentHomeworkSubmission, StudentHomeworkAttachment
+from pydantic import BaseModel
+from datetime import datetime
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -275,13 +279,43 @@ async def get_course_outline(
                 if resource_info:
                     resources_data.append(resource_info)
             
+            # 获取小节的作业及学生提交状态
+            homework_query = text("""
+                SELECT hw.id, hw.title, hw.description, hw.deadline, hw.sort_order,
+                       sub.id as submission_id, sub.status, sub.score, sub.submitted_at
+                FROM course_section_homework hw
+                LEFT JOIN student_homework_submission sub 
+                    ON sub.homework_id = hw.id AND sub.student_id = :student_id
+                WHERE hw.chapter_id = :section_id
+                ORDER BY hw.sort_order
+            """)
+            homework_result = await db.execute(homework_query, {
+                "section_id": section_id,
+                "student_id": current_user.id
+            })
+            homework_rows = homework_result.fetchall()
+            
+            homework_data = []
+            for hw_row in homework_rows:
+                homework_data.append({
+                    "id": hw_row[0],
+                    "title": hw_row[1],
+                    "description": hw_row[2],
+                    "deadline": hw_row[3].isoformat() if hw_row[3] else None,
+                    "sort_order": hw_row[4],
+                    "submission_status": hw_row[6] or "not_started",  # draft, submitted, graded, not_started
+                    "score": hw_row[7],
+                    "submitted_at": hw_row[8].isoformat() if hw_row[8] else None,
+                    "has_submission": hw_row[5] is not None
+                })
+            
             sections_data.append({
                 "id": section_row[0],
                 "title": section_row[2],
                 "sort_order": section_row[3],
                 "resources": resources_data,
                 "exam_papers": [],
-                "homework": []
+                "homework": homework_data
             })
         
         outline.append({
@@ -293,3 +327,319 @@ async def get_course_outline(
         })
     
     return outline
+
+
+# ==================== 作业相关API ====================
+
+class HomeworkSubmissionCreate(BaseModel):
+    """作业提交数据模型"""
+    content: str | None = None
+    is_final: bool = False  # 是否最终提交
+
+
+class AttachmentInfo(BaseModel):
+    """附件信息"""
+    file_name: str
+    file_url: str
+    file_size: int | None = None
+    file_type: str | None = None
+
+
+@router.get("/homeworks/{homework_id}")
+async def get_homework_detail(
+    homework_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    获取作业详情及学生的提交记录
+    """
+    # 查询作业信息
+    hw_result = await db.execute(
+        select(CourseSectionHomework)
+        .options(selectinload(CourseSectionHomework.attachments))
+        .where(CourseSectionHomework.id == homework_id)
+    )
+    homework = hw_result.scalars().first()
+    
+    if not homework:
+        raise HTTPException(status_code=404, detail="作业不存在")
+    
+    # 验证学生是否有权限访问（通过班级-课程关联）
+    student_result = await db.execute(
+        select(StudentProfile).where(StudentProfile.user_id == current_user.id)
+    )
+    student_profile = student_result.scalars().first()
+    
+    if not student_profile:
+        raise HTTPException(status_code=403, detail="学生信息不存在")
+    
+    # 获取作业所属章节和课程
+    from app.models.base import CourseChapter
+    chapter_result = await db.execute(
+        select(CourseChapter).where(CourseChapter.id == homework.chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    
+    # 验证学生班级是否有该课程
+    class_course_result = await db.execute(
+        select(ClassCourseRelation).where(
+            ClassCourseRelation.class_id == student_profile.class_id,
+            ClassCourseRelation.course_id == chapter.course_id
+        )
+    )
+    if not class_course_result.scalars().first():
+        raise HTTPException(status_code=403, detail="您没有权限访问此作业")
+    
+    # 查询学生的提交记录
+    submission_result = await db.execute(
+        select(StudentHomeworkSubmission)
+        .options(selectinload(StudentHomeworkSubmission.attachments))
+        .where(
+            StudentHomeworkSubmission.homework_id == homework_id,
+            StudentHomeworkSubmission.student_id == current_user.id
+        )
+    )
+    submission = submission_result.scalars().first()
+    
+    # 构造作业附件信息
+    homework_attachments = []
+    if homework.attachments:
+        for att in homework.attachments:
+            homework_attachments.append({
+                "id": att.id,
+                "file_name": att.file_name,
+                "file_url": att.file_url,
+                "file_size": att.file_size,
+                "file_type": att.file_type
+            })
+    
+    # 构造提交信息
+    submission_data = None
+    if submission:
+        student_attachments = []
+        if submission.attachments:
+            for att in submission.attachments:
+                student_attachments.append({
+                    "id": att.id,
+                    "file_name": att.file_name,
+                    "file_url": att.file_url,
+                    "file_size": att.file_size,
+                    "file_type": att.file_type
+                })
+        
+        submission_data = {
+            "id": submission.id,
+            "content": submission.content,
+            "status": submission.status,
+            "score": submission.score,
+            "teacher_comment": submission.teacher_comment,
+            "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+            "graded_at": submission.graded_at.isoformat() if submission.graded_at else None,
+            "attachments": student_attachments
+        }
+    
+    return {
+        "id": homework.id,
+        "title": homework.title,
+        "description": homework.description,
+        "deadline": homework.deadline.isoformat() if homework.deadline else None,
+        "attachments": homework_attachments,
+        "submission": submission_data
+    }
+
+
+@router.post("/homeworks/{homework_id}/submit")
+async def submit_homework(
+    homework_id: int,
+    data: HomeworkSubmissionCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    提交或更新作业
+    """
+    # 查询作业信息
+    hw_result = await db.execute(
+        select(CourseSectionHomework).where(CourseSectionHomework.id == homework_id)
+    )
+    homework = hw_result.scalars().first()
+    
+    if not homework:
+        raise HTTPException(status_code=404, detail="作业不存在")
+    
+    # 获取章节信息
+    from app.models.base import CourseChapter
+    chapter_result = await db.execute(
+        select(CourseChapter).where(CourseChapter.id == homework.chapter_id)
+    )
+    chapter = chapter_result.scalars().first()
+    
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+    
+    # 验证学生权限
+    student_result = await db.execute(
+        select(StudentProfile).where(StudentProfile.user_id == current_user.id)
+    )
+    student_profile = student_result.scalars().first()
+    
+    if not student_profile:
+        raise HTTPException(status_code=403, detail="学生信息不存在")
+    
+    class_course_result = await db.execute(
+        select(ClassCourseRelation).where(
+            ClassCourseRelation.class_id == student_profile.class_id,
+            ClassCourseRelation.course_id == chapter.course_id
+        )
+    )
+    if not class_course_result.scalars().first():
+        raise HTTPException(status_code=403, detail="您没有权限提交此作业")
+    
+    # 查询或创建提交记录
+    submission_result = await db.execute(
+        select(StudentHomeworkSubmission).where(
+            StudentHomeworkSubmission.homework_id == homework_id,
+            StudentHomeworkSubmission.student_id == current_user.id
+        )
+    )
+    submission = submission_result.scalars().first()
+    
+    if submission:
+        # 更新现有提交
+        submission.content = data.content
+        if data.is_final:
+            submission.status = 'submitted'
+            submission.submitted_at = datetime.utcnow()
+        else:
+            # 草稿状态
+            if submission.status == 'draft' or submission.status is None:
+                submission.status = 'draft'
+        submission.updated_at = datetime.utcnow()
+    else:
+        # 创建新提交
+        submission = StudentHomeworkSubmission(
+            student_id=current_user.id,
+            homework_id=homework_id,
+            course_id=chapter.course_id,
+            chapter_id=homework.chapter_id,
+            content=data.content,
+            status='submitted' if data.is_final else 'draft',
+            submitted_at=datetime.utcnow() if data.is_final else None
+        )
+        db.add(submission)
+    
+    await db.commit()
+    await db.refresh(submission)
+    
+    return {
+        "id": submission.id,
+        "status": submission.status,
+        "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+        "message": "作业提交成功" if data.is_final else "草稿保存成功"
+    }
+
+
+@router.post("/homeworks/attachments/upload")
+async def upload_homework_attachment(
+    homework_id: int,
+    file_name: str,
+    file_url: str,
+    file_size: int | None = None,
+    file_type: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    添加作业附件记录
+    注意：文件已通过 /api/v1/upload/file 上传，这里只是关联到作业提交
+    """
+    # 查询或创建提交记录
+    submission_result = await db.execute(
+        select(StudentHomeworkSubmission).where(
+            StudentHomeworkSubmission.homework_id == homework_id,
+            StudentHomeworkSubmission.student_id == current_user.id
+        )
+    )
+    submission = submission_result.scalars().first()
+    
+    if not submission:
+        # 如果还没有提交记录，创建一个草稿
+        hw_result = await db.execute(
+            select(CourseSectionHomework).where(CourseSectionHomework.id == homework_id)
+        )
+        homework = hw_result.scalars().first()
+        
+        if not homework:
+            raise HTTPException(status_code=404, detail="作业不存在")
+        
+        from app.models.base import CourseChapter
+        chapter_result = await db.execute(
+            select(CourseChapter).where(CourseChapter.id == homework.chapter_id)
+        )
+        chapter = chapter_result.scalars().first()
+        
+        submission = StudentHomeworkSubmission(
+            student_id=current_user.id,
+            homework_id=homework_id,
+            course_id=chapter.course_id,
+            chapter_id=homework.chapter_id,
+            status='draft'
+        )
+        db.add(submission)
+        await db.flush()
+    
+    # 创建附件记录
+    attachment = StudentHomeworkAttachment(
+        submission_id=submission.id,
+        file_name=file_name,
+        file_url=file_url,
+        file_size=file_size,
+        file_type=file_type
+    )
+    db.add(attachment)
+    await db.commit()
+    await db.refresh(attachment)
+    
+    return {
+        "id": attachment.id,
+        "file_name": attachment.file_name,
+        "file_url": attachment.file_url,
+        "file_size": attachment.file_size,
+        "file_type": attachment.file_type,
+        "message": "附件添加成功"
+    }
+
+
+@router.delete("/homeworks/attachments/{attachment_id}")
+async def delete_homework_attachment(
+    attachment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    删除作业附件
+    """
+    # 查询附件
+    att_result = await db.execute(
+        select(StudentHomeworkAttachment)
+        .options(selectinload(StudentHomeworkAttachment.submission))
+        .where(StudentHomeworkAttachment.id == attachment_id)
+    )
+    attachment = att_result.scalars().first()
+    
+    if not attachment:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    
+    # 验证是否是学生自己的附件
+    if attachment.submission.student_id != current_user.id:
+        raise HTTPException(status_code=403, detail="您没有权限删除此附件")
+    
+    # 删除附件记录
+    await db.delete(attachment)
+    await db.commit()
+    
+    return {"message": "附件删除成功"}

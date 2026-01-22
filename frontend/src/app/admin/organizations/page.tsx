@@ -789,7 +789,7 @@ export default function AdminOrganizationsPage() {
                     <option value="" className="py-2">{t.admin.organizations.noParent}</option>
                   {allOrgsFlat.map((org) => (
                       <option key={org.id} value={org.id} className="py-2">
-                        {org.level === 0 ? '[根] ' : `[L${org.level}] ${'　'.repeat(org.level)}├─ `}{org.name}
+                        {org.level === 0 ? '[根] ' : `[L${org.level ?? 0}] ${'　'.repeat(org.level ?? 0)}├─ `}{org.name}
                     </option>
                   ))}
                 </select>
@@ -868,7 +868,7 @@ export default function AdminOrganizationsPage() {
                     <option value="" className="py-2">{t.admin.organizations.noParent}</option>
                   {allOrgsFlat.filter(o => o.id !== editingOrg.id).map((org) => (
                       <option key={org.id} value={org.id} className="py-2">
-                        {org.level === 0 ? '[根] ' : `[L${org.level}] ${'　'.repeat(org.level)}├─ `}{org.name}
+                        {org.level === 0 ? '[根] ' : `[L${org.level ?? 0}] ${'　'.repeat(org.level ?? 0)}├─ `}{org.name}
                     </option>
                   ))}
                 </select>

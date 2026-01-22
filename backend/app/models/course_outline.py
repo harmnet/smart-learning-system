@@ -103,9 +103,28 @@ class CourseChapterKnowledgeGraph(Base):
     knowledge_graph_id = Column(Integer, ForeignKey("knowledge_graph.id", ondelete="CASCADE"), nullable=False)
     knowledge_node_id = Column(Integer, ForeignKey("knowledge_node.id", ondelete="CASCADE"), nullable=True)  # 关联的具体节点（可选）
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     chapter = relationship("CourseChapter", foreign_keys=[chapter_id], backref="knowledge_graph_links")
     knowledge_graph = relationship("KnowledgeGraph", foreign_keys=[knowledge_graph_id])
     knowledge_node = relationship("KnowledgeNode", foreign_keys=[knowledge_node_id])
+
+
+class HomeworkAttachment(Base):
+    """
+    作业附件表
+    """
+    __tablename__ = "homework_attachment"
+
+    id = Column(Integer, primary_key=True, index=True)
+    homework_id = Column(Integer, ForeignKey("course_section_homework.id", ondelete="CASCADE"), nullable=False)
+    file_name = Column(String(255), nullable=False)  # 原始文件名
+    file_url = Column(String(500), nullable=False)  # 文件URL（OSS地址）
+    file_size = Column(Integer, nullable=True)  # 文件大小（字节）
+    file_type = Column(String(100), nullable=True)  # 文件MIME类型
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    homework = relationship("CourseSectionHomework", foreign_keys=[homework_id], backref="attachments")
 

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
-import courseOutlineService, { CourseOutline, OutlineChapter, OutlineSection, LearningRule, KnowledgeGraphLink } from '@/services/courseOutline.service';
+import courseOutlineService, { CourseOutline, OutlineChapter, OutlineSection, LearningRule, KnowledgeGraphLink, Homework, HomeworkCreate, HomeworkUpdate, HomeworkAttachment } from '@/services/courseOutline.service';
+import { uploadService } from '@/services/upload.service';
 import { courseService } from '@/services/course.service';
 import { knowledgeGraphService, KnowledgeGraph } from '@/services/knowledgeGraph.service';
 import { examService, Exam } from '@/services/exam.service';
@@ -59,6 +60,20 @@ export default function CourseOutlinePage() {
   // 章选择知识图谱后，显示该图谱的所有节点
   const [selectedGraphForChapter, setSelectedGraphForChapter] = useState<number | null>(null);
   const [chapterKnowledgeNodes, setChapterKnowledgeNodes] = useState<any[]>([]);
+
+  // 课后作业相关状态
+  const [linkedHomeworks, setLinkedHomeworks] = useState<Homework[]>([]);
+  const [showHomeworkModal, setShowHomeworkModal] = useState(false);
+  const [editingHomework, setEditingHomework] = useState<Homework | null>(null);
+  const [homeworkTitle, setHomeworkTitle] = useState('');
+  const [homeworkDescription, setHomeworkDescription] = useState('');
+  const [homeworkAttachments, setHomeworkAttachments] = useState<HomeworkAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  
+  // 预览相关状态
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
 
   useEffect(() => {
     loadCourseInfo();
@@ -182,25 +197,28 @@ export default function CourseOutlinePage() {
         setAvailableKnowledgeNodes([]);
       }
 
-      // 从大纲数据中获取关联的考试和资源
+      // 从大纲数据中获取关联的考试、资源和作业
       const outline = await courseOutlineService.getOutline(courseId);
       let examIds: number[] = [];
       let resourceList: any[] = [];
+      let homeworkList: Homework[] = [];
 
       outline.outline.forEach((chapter: OutlineChapter) => {
         if (chapter.id === nodeId) {
           examIds = chapter.exam_papers.map((e: any) => e.id);
-    }
+        }
         chapter.sections.forEach((section: OutlineSection) => {
           if (section.id === nodeId) {
             examIds = section.exam_papers.map((e: any) => e.id);
             resourceList = section.resources;
-    }
+            homeworkList = section.homeworks || [];
+          }
         });
       });
 
       setLinkedExams(examIds);
       setLinkedResources(resourceList);
+      setLinkedHomeworks(homeworkList);
     } catch (error) {
       console.error('Failed to load node details:', error);
     }
@@ -468,7 +486,7 @@ export default function CourseOutlinePage() {
     if (!selectedNode) return;
 
     if (!confirm('确定取消关联该资源吗？')) return;
-    
+
     try {
       await courseOutlineService.unlinkResource(selectedNode.id, resourceId);
       toast.success('取消关联成功');
@@ -477,6 +495,120 @@ export default function CourseOutlinePage() {
       console.error('Failed to unlink resource:', error);
       toast.error('操作失败: ' + (error.response?.data?.detail || error.message));
     }
+  };
+
+  // ========== 课后作业操作 ==========
+
+  const handleAddHomework = () => {
+    setEditingHomework(null);
+    setHomeworkTitle('');
+    setHomeworkDescription('');
+    setHomeworkAttachments([]);
+    setShowHomeworkModal(true);
+  };
+
+  const handleEditHomework = (homework: Homework) => {
+    setEditingHomework(homework);
+    setHomeworkTitle(homework.title);
+    setHomeworkDescription(homework.description || '');
+    setHomeworkAttachments(homework.attachments || []);
+    setShowHomeworkModal(true);
+  };
+
+  const handleSaveHomework = async () => {
+    if (!selectedNode || !selectedNode.parent_id) {
+      toast.warning('只有小节可以添加作业');
+      return;
+    }
+
+    if (!homeworkTitle.trim()) {
+      toast.warning('请输入作业标题');
+      return;
+    }
+
+    try {
+      if (editingHomework) {
+        // 更新作业
+        const updateData: HomeworkUpdate = {
+          title: homeworkTitle,
+          description: homeworkDescription || undefined,
+          attachments: homeworkAttachments.length > 0 ? homeworkAttachments : undefined,
+        };
+        await courseOutlineService.updateHomework(editingHomework.id, updateData);
+        toast.success('作业更新成功');
+      } else {
+        // 创建作业
+        const createData: HomeworkCreate = {
+          title: homeworkTitle,
+          description: homeworkDescription || undefined,
+          sort_order: linkedHomeworks.length,
+          attachments: homeworkAttachments.length > 0 ? homeworkAttachments : undefined,
+        };
+        await courseOutlineService.createHomework(selectedNode.id, createData);
+        toast.success('作业创建成功');
+      }
+
+      setShowHomeworkModal(false);
+      loadNodeDetails(selectedNode.id);
+    } catch (error: any) {
+      console.error('Failed to save homework:', error);
+      toast.error('保存失败: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleDeleteHomework = async (homeworkId: number) => {
+    if (!confirm('确定要删除这个作业吗？')) return;
+
+    try {
+      await courseOutlineService.deleteHomework(homeworkId);
+      toast.success('作业删除成功');
+      if (selectedNode) {
+        loadNodeDetails(selectedNode.id);
+      }
+    } catch (error: any) {
+      console.error('Failed to delete homework:', error);
+      toast.error('删除失败: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingFile(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const result = await uploadService.uploadFile(file, 'homework');
+
+        const newAttachment: HomeworkAttachment = {
+          file_name: file.name,
+          file_url: result.url,
+          file_size: file.size,
+          file_type: file.type,
+        };
+        setHomeworkAttachments(prev => [...prev, newAttachment]);
+      }
+      toast.success('文件上传成功');
+    } catch (error: any) {
+      console.error('Failed to upload file:', error);
+      toast.error('文件上传失败: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setUploadingFile(false);
+      // 清空input
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setHomeworkAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
     return (
@@ -1008,6 +1140,123 @@ export default function CourseOutlinePage() {
                     </div>
                   </div>
               )}
+
+                {/* 课后作业（仅小节） */}
+                {selectedNode.parent_id && (
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-900">课后作业</h3>
+                      <button
+                        onClick={handleAddHomework}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        添加作业
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {linkedHomeworks.length > 0 ? (
+                        <div className="space-y-3">
+                          {linkedHomeworks.map((homework) => (
+                            <div key={homework.id} className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-slate-900">{homework.title}</h4>
+                                  {homework.description && (
+                                    <div
+                                      className="text-sm text-slate-600 mt-1 prose prose-sm max-w-none"
+                                      dangerouslySetInnerHTML={{ __html: homework.description }}
+                                    />
+                                  )}
+                                  {homework.attachments && homework.attachments.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-xs text-slate-500 mb-1">附件：</p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {homework.attachments.map((att, idx) => (
+                                          <div key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-white rounded text-xs border border-slate-200">
+                                            <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                                            </svg>
+                                            <span className="text-slate-700">{att.file_name}</span>
+                                            {uploadService.isPreviewable(att.file_name) && (
+                                              <button
+                                                onClick={async (e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  try {
+                                                    const result = await uploadService.getPreviewUrl(att.file_url);
+                                                    setPreviewUrl(result.preview_url);
+                                                    setPreviewFileName(att.file_name);
+                                                    setShowPreviewModal(true);
+                                                  } catch (error: any) {
+                                                    console.error('预览失败:', error);
+                                                    toast.error('预览失败: ' + (error.response?.data?.detail || error.message));
+                                                  }
+                                                }}
+                                                className="ml-1 text-blue-600 hover:text-blue-800 cursor-pointer"
+                                                title="在线预览"
+                                              >
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                              </button>
+                                            )}
+                                            <a
+                                              href={att.file_url}
+                                              download
+                                              className="ml-1 text-slate-500 hover:text-slate-700"
+                                              title="下载"
+                                            >
+                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                              </svg>
+                                            </a>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <button
+                                    onClick={() => handleEditHomework(homework)}
+                                    className="p-1 hover:bg-blue-200 rounded text-slate-600"
+                                    title="编辑"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteHomework(homework.id)}
+                                    className="p-1 hover:bg-red-100 rounded text-red-600"
+                                    title="删除"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-slate-500">
+                          <svg className="w-12 h-12 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                          </svg>
+                          <p className="text-sm">暂无作业</p>
+                          <p className="text-xs mt-1">点击上方"添加作业"按钮创建课后作业</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
             ) : (
               <div className="flex items-center justify-center h-full">
@@ -1059,6 +1308,257 @@ export default function CourseOutlinePage() {
               >
                 保存
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 课后作业编辑弹窗 */}
+      {showHomeworkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-slate-900">
+                {editingHomework ? '编辑作业' : '添加作业'}
+              </h2>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* 作业标题 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  作业标题 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={homeworkTitle}
+                  onChange={(e) => setHomeworkTitle(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="请输入作业标题"
+                />
+              </div>
+
+              {/* 作业要求（富文本） */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  作业要求
+                </label>
+                <div className="border border-slate-300 rounded-lg overflow-hidden">
+                  <div className="bg-slate-50 border-b border-slate-200 p-2 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = document.getElementById('homework-description') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = textarea.value;
+                        const selectedText = text.substring(start, end);
+                        const newText = text.substring(0, start) + '<strong>' + selectedText + '</strong>' + text.substring(end);
+                        setHomeworkDescription(newText);
+                      }}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-600"
+                      title="加粗"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 12h8a4 4 0 100-8H6v8zm0 0h9a4 4 0 110 8H6v-8z"></path>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textarea = document.getElementById('homework-description') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const text = textarea.value;
+                        const selectedText = text.substring(start, end);
+                        const newText = text.substring(0, start) + '<em>' + selectedText + '</em>' + text.substring(end);
+                        setHomeworkDescription(newText);
+                      }}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-600"
+                      title="斜体"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l-4 4 4 4M6 16l4-4-4-4"></path>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHomeworkDescription(prev => prev + '<ul><li>项目1</li><li>项目2</li></ul>');
+                      }}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-600"
+                      title="无序列表"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHomeworkDescription(prev => prev + '<ol><li>步骤1</li><li>步骤2</li></ol>');
+                      }}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-600"
+                      title="有序列表"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <textarea
+                    id="homework-description"
+                    value={homeworkDescription}
+                    onChange={(e) => setHomeworkDescription(e.target.value)}
+                    rows={6}
+                    className="w-full px-4 py-3 border-0 focus:ring-0 resize-none"
+                    placeholder="请输入作业要求，支持HTML格式..."
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">支持HTML格式，如 &lt;strong&gt;加粗&lt;/strong&gt;、&lt;ul&gt;&lt;li&gt;列表&lt;/li&gt;&lt;/ul&gt;</p>
+              </div>
+
+              {/* 附件上传 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  附件
+                </label>
+
+                {/* 已上传的附件列表 */}
+                {homeworkAttachments.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    {homeworkAttachments.map((att, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                          </svg>
+                          <span className="text-sm text-slate-700">{att.file_name}</span>
+                          {att.file_size && (
+                            <span className="text-xs text-slate-500">({formatFileSize(att.file_size)})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {uploadService.isPreviewable(att.file_name) && (
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                try {
+                                  const result = await uploadService.getPreviewUrl(att.file_url);
+                                  setPreviewUrl(result.preview_url);
+                                  setPreviewFileName(att.file_name);
+                                  setShowPreviewModal(true);
+                                } catch (error: any) {
+                                  console.error('预览失败:', error);
+                                  toast.error('预览失败: ' + (error.response?.data?.detail || error.message));
+                                }
+                              }}
+                              className="p-1 hover:bg-blue-100 rounded text-blue-600 cursor-pointer"
+                              title="在线预览"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(index)}
+                            className="p-1 hover:bg-red-100 rounded text-red-600"
+                            title="删除"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 上传按钮 */}
+                <label className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors ${uploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    disabled={uploadingFile}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.jpg,.jpeg,.png,.gif"
+                  />
+                  {uploadingFile ? (
+                    <>
+                      <svg className="w-5 h-5 text-slate-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-slate-500">上传中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                      </svg>
+                      <span className="text-slate-500">点击上传附件</span>
+                    </>
+                  )}
+                </label>
+                <p className="text-xs text-slate-500 mt-1">支持 PDF、Office文档、图片、压缩包等格式，单个文件不超过100MB</p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-200 flex gap-3">
+              <button
+                onClick={() => setShowHomeworkModal(false)}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveHomework}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 文档预览模态框 */}
+      {showPreviewModal && previewUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-[95vw] h-[95vh] flex flex-col">
+            {/* 预览头部 */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900">
+                文档预览 - {previewFileName}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setPreviewUrl(null);
+                  setPreviewFileName('');
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            {/* 预览内容 */}
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={previewUrl}
+                className="w-full h-full border-0"
+                title="文档预览"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
+              />
             </div>
           </div>
         </div>

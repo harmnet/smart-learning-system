@@ -159,3 +159,89 @@ class AIQuizRecord(Base):
     resource = relationship("TeachingResource", foreign_keys=[resource_id])
     assessment = relationship("StudentLearningAssessment", foreign_keys=[assessment_id])
     llm_config = relationship("LLMConfig", foreign_keys=[llm_config_id])
+
+
+class StudentHomeworkSubmission(Base):
+    """
+    学生作业提交记录表
+    记录学生针对每个作业的提交情况
+    """
+    __tablename__ = "student_homework_submission"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="学生ID")
+    homework_id = Column(Integer, ForeignKey("course_section_homework.id", ondelete="CASCADE"), nullable=False, comment="作业ID")
+    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False, comment="课程ID")
+    chapter_id = Column(Integer, ForeignKey("course_chapter.id", ondelete="CASCADE"), nullable=False, comment="章节ID（小节）")
+    content = Column(Text, nullable=True, comment="富文本作业内容")
+    status = Column(String(20), default='draft', comment="状态：draft（草稿）、submitted（已提交）、graded（已评分）")
+    score = Column(Float, nullable=True, comment="教师评分")
+    teacher_comment = Column(Text, nullable=True, comment="教师评语")
+    submitted_at = Column(DateTime, nullable=True, comment="提交时间")
+    graded_at = Column(DateTime, nullable=True, comment="评分时间")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    
+    # Relationships
+    student = relationship("User", foreign_keys=[student_id])
+    homework = relationship("CourseSectionHomework", foreign_keys=[homework_id])
+    course = relationship("Course", foreign_keys=[course_id])
+    chapter = relationship("CourseChapter", foreign_keys=[chapter_id])
+    grade_histories = relationship("StudentHomeworkGradeHistory", foreign_keys="[StudentHomeworkGradeHistory.submission_id]", cascade="all, delete-orphan", lazy="selectin")
+
+
+class StudentHomeworkGradeHistory(Base):
+    """
+    学生作业评分历史记录表
+    """
+    __tablename__ = "student_homework_grade_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("student_homework_submission.id", ondelete="CASCADE"), nullable=False, comment="作业提交记录ID")
+    teacher_id = Column(Integer, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="评分教师ID")
+    score = Column(Float, nullable=True, comment="评分")
+    teacher_comment = Column(Text, nullable=True, comment="评分评语")
+    graded_at = Column(DateTime, default=datetime.utcnow, comment="评分时间")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    
+    # Relationships
+    submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id])
+    teacher = relationship("User", foreign_keys=[teacher_id])
+
+
+class StudentHomeworkAIGradingLog(Base):
+    __tablename__ = "student_homework_ai_grading_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("student_homework_submission.id", ondelete="CASCADE"), nullable=False, comment="作业提交记录ID")
+    teacher_id = Column(Integer, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="触发教师ID")
+    llm_config_id = Column(Integer, ForeignKey("llm_config.id"), nullable=True, comment="使用的大模型配置ID")
+    prompt = Column(Text, nullable=False, comment="AI批改提示词")
+    result = Column(Text, nullable=False, comment="AI批改原始结果")
+    score = Column(Float, nullable=True, comment="AI评分")
+    comment = Column(Text, nullable=True, comment="AI评语")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+
+    submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id])
+    teacher = relationship("User", foreign_keys=[teacher_id])
+    llm_config = relationship("LLMConfig", foreign_keys=[llm_config_id])
+
+
+class StudentHomeworkAttachment(Base):
+    """
+    学生作业附件表
+    存储学生提交作业时上传的附件文件
+    """
+    __tablename__ = "student_homework_attachment"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("student_homework_submission.id", ondelete="CASCADE"), nullable=False, comment="作业提交记录ID")
+    file_name = Column(String(255), nullable=False, comment="原始文件名")
+    file_url = Column(String(500), nullable=False, comment="文件URL（OSS地址或本地路径）")
+    file_size = Column(Integer, nullable=True, comment="文件大小（字节）")
+    file_type = Column(String(100), nullable=True, comment="文件类型（扩展名）")
+    sort_order = Column(Integer, default=0, comment="排序")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    
+    # Relationships
+    submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id], backref="attachments")

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db.session import get_db
-from app.models.course_outline import CourseSectionResource, CourseChapterExamPaper, CourseSectionHomework, CourseChapterExam
+from app.models.course_outline import CourseSectionResource, CourseChapterExamPaper, CourseSectionHomework, CourseChapterExam, HomeworkAttachment
 from app.models.base import Course, CourseChapter
 from app.models.teaching_resource import TeachingResource
 from app.models.reference_material import ReferenceMaterial
@@ -75,17 +75,25 @@ class SectionResourceCreate(BaseModel):
 class ExamPaperLink(BaseModel):
     exam_paper_id: int
 
+class AttachmentData(BaseModel):
+    file_name: str
+    file_url: str
+    file_size: Optional[int] = None
+    file_type: Optional[str] = None
+
 class HomeworkCreate(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: Optional[str] = None  # 支持富文本HTML内容
     deadline: Optional[datetime] = None
     sort_order: int = 0
+    attachments: Optional[List[AttachmentData]] = None  # 附件列表
 
 class HomeworkUpdate(BaseModel):
     title: Optional[str] = None
-    description: Optional[str] = None
+    description: Optional[str] = None  # 支持富文本HTML内容
     deadline: Optional[datetime] = None
     sort_order: Optional[int] = None
+    attachments: Optional[List[AttachmentData]] = None  # 附件列表（会替换原有附件）
 
 @router.get("/courses/{course_id}/outline")
 async def get_course_outline(
@@ -163,9 +171,11 @@ async def get_course_outline(
             exams_by_chapter[exam_link.chapter_id] = []
         exams_by_chapter[exam_link.chapter_id].append(exam_link)
     
-    # 加载作业
+    # 加载作业（包含附件）
     homeworks_result = await db.execute(
-        select(CourseSectionHomework).where(CourseSectionHomework.chapter_id.in_(chapter_ids))
+        select(CourseSectionHomework)
+        .options(selectinload(CourseSectionHomework.attachments))
+        .where(CourseSectionHomework.chapter_id.in_(chapter_ids))
     )
     all_homeworks = homeworks_result.scalars().all()
     homeworks_by_chapter = {}
@@ -234,6 +244,16 @@ async def get_course_outline(
                         "description": hw.description,
                         "deadline": hw.deadline.isoformat() if hw.deadline else None,
                         "sort_order": hw.sort_order,
+                        "attachments": [
+                            {
+                                "id": att.id,
+                                "file_name": att.file_name,
+                                "file_url": att.file_url,
+                                "file_size": att.file_size,
+                                "file_type": att.file_type,
+                            }
+                            for att in (hw.attachments or [])
+                        ],
                     }
                     for hw in homeworks_by_chapter.get(section.id, [])
                 ],
@@ -688,24 +708,24 @@ async def create_homework(
     current_user = Depends(get_current_user),
 ) -> Any:
     """
-    为小节创建作业
+    为小节创建作业（支持富文本描述和附件）
     """
     chapter_result = await db.execute(
         select(CourseChapter).options(selectinload(CourseChapter.course))
         .where(CourseChapter.id == chapter_id)
     )
     chapter = chapter_result.scalars().first()
-    
+
     if not chapter:
         raise HTTPException(status_code=404, detail="Chapter not found")
-    
+
     if chapter.course.main_teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
-    
+
     # 验证必须是小节
     if chapter.parent_id is None:
         raise HTTPException(status_code=400, detail="Homework can only be added to sections, not chapters")
-    
+
     homework = CourseSectionHomework(
         chapter_id=chapter_id,
         title=homework_data.title,
@@ -714,15 +734,38 @@ async def create_homework(
         sort_order=homework_data.sort_order
     )
     db.add(homework)
+    await db.flush()  # 获取homework.id
+
+    # 添加附件
+    attachments_data = []
+    if homework_data.attachments:
+        for i, att in enumerate(homework_data.attachments):
+            attachment = HomeworkAttachment(
+                homework_id=homework.id,
+                file_name=att.file_name,
+                file_url=att.file_url,
+                file_size=att.file_size,
+                file_type=att.file_type,
+                sort_order=i
+            )
+            db.add(attachment)
+            attachments_data.append({
+                "file_name": att.file_name,
+                "file_url": att.file_url,
+                "file_size": att.file_size,
+                "file_type": att.file_type,
+            })
+
     await db.commit()
     await db.refresh(homework)
-    
+
     return {
         "id": homework.id,
         "title": homework.title,
         "description": homework.description,
         "deadline": homework.deadline.isoformat() if homework.deadline else None,
         "sort_order": homework.sort_order,
+        "attachments": attachments_data,
     }
 
 @router.put("/homeworks/{homework_id}")
@@ -733,20 +776,24 @@ async def update_homework(
     current_user = Depends(get_current_user),
 ) -> Any:
     """
-    更新作业
+    更新作业（支持富文本描述和附件）
     """
     homework_result = await db.execute(
-        select(CourseSectionHomework).options(selectinload(CourseSectionHomework.chapter).selectinload(CourseChapter.course))
+        select(CourseSectionHomework)
+        .options(
+            selectinload(CourseSectionHomework.chapter).selectinload(CourseChapter.course),
+            selectinload(CourseSectionHomework.attachments)
+        )
         .where(CourseSectionHomework.id == homework_id)
     )
     homework = homework_result.scalars().first()
-    
+
     if not homework:
         raise HTTPException(status_code=404, detail="Homework not found")
-    
+
     if homework.chapter.course.main_teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only the main teacher can manage course outline")
-    
+
     if homework_data.title is not None:
         homework.title = homework_data.title
     if homework_data.description is not None:
@@ -755,16 +802,53 @@ async def update_homework(
         homework.deadline = homework_data.deadline
     if homework_data.sort_order is not None:
         homework.sort_order = homework_data.sort_order
-    
+
+    # 如果提供了附件列表，则更新附件（先删除旧的，再添加新的）
+    attachments_data = []
+    if homework_data.attachments is not None:
+        # 删除旧附件
+        for old_att in homework.attachments:
+            await db.delete(old_att)
+
+        # 添加新附件
+        for i, att in enumerate(homework_data.attachments):
+            attachment = HomeworkAttachment(
+                homework_id=homework.id,
+                file_name=att.file_name,
+                file_url=att.file_url,
+                file_size=att.file_size,
+                file_type=att.file_type,
+                sort_order=i
+            )
+            db.add(attachment)
+            attachments_data.append({
+                "id": None,  # 新附件还没有ID
+                "file_name": att.file_name,
+                "file_url": att.file_url,
+                "file_size": att.file_size,
+                "file_type": att.file_type,
+            })
+    else:
+        # 保持原有附件
+        for att in homework.attachments:
+            attachments_data.append({
+                "id": att.id,
+                "file_name": att.file_name,
+                "file_url": att.file_url,
+                "file_size": att.file_size,
+                "file_type": att.file_type,
+            })
+
     await db.commit()
     await db.refresh(homework)
-    
+
     return {
         "id": homework.id,
         "title": homework.title,
         "description": homework.description,
         "deadline": homework.deadline.isoformat() if homework.deadline else None,
         "sort_order": homework.sort_order,
+        "attachments": attachments_data,
     }
 
 @router.delete("/homeworks/{homework_id}")

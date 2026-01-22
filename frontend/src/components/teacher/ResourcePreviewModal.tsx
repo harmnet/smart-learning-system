@@ -54,9 +54,14 @@ export default function ResourcePreviewModal({
         console.log('XLSX库加载完成');
       }
       
-      // 下载文件
+      // 下载文件（添加认证信息）
       console.log('开始下载文件:', url);
-      const response = await fetch(url);
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(url, { headers });
       console.log('文件下载响应:', response.status, response.ok);
       if (!response.ok) {
         throw new Error(`文件下载失败: ${response.status} ${response.statusText}`);
@@ -145,8 +150,18 @@ export default function ResourcePreviewModal({
           setDownloadUrl(downloadUrlValue);
           setPreviewType(previewInfo.preview_type || 'download');
           
+          // 如果后端返回的是WebOffice类型，使用WebOffice在线预览
+          if (previewInfo.preview_type === 'weboffice') {
+            console.log('使用WebOffice预览:', previewUrlValue);
+            setOssPreviewUrl(previewUrlValue);
+            setUseOfficeViewer(true);
+            setWebofficeFailed(false);
+            setOfficeContent(null);
+            setLoading(false);
+            setLoadingPreviewUrl(false);
+          }
           // 如果后端返回的是PDF类型，直接使用PDF预览，不需要前端转换
-          if (previewInfo.preview_type === 'pdf' || resourceType === 'pdf') {
+          else if (previewInfo.preview_type === 'pdf' || resourceType === 'pdf') {
             console.log('使用PDF预览:', previewUrlValue);
             setPdfPreviewUrl(previewUrlValue);
             setUseOfficeViewer(false);
@@ -228,8 +243,45 @@ export default function ResourcePreviewModal({
     const resourceType = (resource.resource_type || resource.file_type || 'unknown').toLowerCase();
     console.log('Rendering preview for resource type:', resourceType, 'resource:', resource);
 
-    // Office文档预览 - 优先使用PDF，如果没有PDF则使用前端JavaScript转换
+    // Office文档预览 - 优先使用WebOffice，其次PDF，最后使用前端JavaScript转换
     if (['word', 'excel', 'ppt'].includes(resourceType)) {
+      // 如果后端返回的是WebOffice类型，使用WebOffice在线预览
+      if (previewType === 'weboffice' && ossPreviewUrl) {
+        return (
+          <div className="w-full h-[70vh] bg-slate-100 rounded-lg overflow-hidden relative">
+            <iframe
+              src={ossPreviewUrl}
+              className="w-full h-full border-0"
+              title="WebOffice Preview"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
+              onLoad={() => {
+                console.log('WebOffice预览加载完成');
+                setLoading(false);
+              }}
+              onError={(e) => {
+                console.error('WebOffice预览加载失败:', e);
+                setError('WebOffice加载失败，请检查文件是否存在');
+                setLoading(false);
+                setWebofficeFailed(true);
+              }}
+            />
+            {loading && (
+              <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                  <p className="text-slate-600">正在加载WebOffice预览...</p>
+                </div>
+              </div>
+            )}
+            {error && (
+              <div className="absolute top-4 left-4 right-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm z-20">
+                {error}
+              </div>
+            )}
+          </div>
+        );
+      }
+      
       // 如果后端返回的是PDF类型，使用PDF预览
       if (previewType === 'pdf' || pdfPreviewUrl || (downloadUrl && downloadUrl.includes('/pdf'))) {
         const pdfUrl = pdfPreviewUrl || downloadUrl || previewUrl;

@@ -108,6 +108,39 @@ export interface OutlineChapter {
   exam_papers: Array<{ id: number }>;
 }
 
+export interface HomeworkAttachment {
+  id?: number;
+  file_name: string;
+  file_url: string;
+  file_size?: number;
+  file_type?: string;
+}
+
+export interface Homework {
+  id: number;
+  title: string;
+  description?: string;  // 支持富文本HTML内容
+  deadline?: string;
+  sort_order: number;
+  attachments?: HomeworkAttachment[];
+}
+
+export interface HomeworkCreate {
+  title: string;
+  description?: string;  // 支持富文本HTML内容
+  deadline?: string;
+  sort_order?: number;
+  attachments?: HomeworkAttachment[];
+}
+
+export interface HomeworkUpdate {
+  title?: string;
+  description?: string;  // 支持富文本HTML内容
+  deadline?: string;
+  sort_order?: number;
+  attachments?: HomeworkAttachment[];
+}
+
 export interface OutlineSection {
   id: number;
   title: string;
@@ -119,13 +152,7 @@ export interface OutlineSection {
     sort_order: number;
   }>;
   exam_papers: Array<{ id: number }>;
-  homeworks: Array<{
-    id: number;
-    title: string;
-    description?: string;
-    deadline?: string;
-    sort_order: number;
-  }>;
+  homeworks: Homework[];
 }
 
 // ========== Service Class ==========
@@ -260,6 +287,31 @@ class CourseOutlineService {
   async getCoursePreview(courseId: number): Promise<CoursePreview> {
     const response = await apiClient.get<CoursePreview>(`/course-outline/courses/${courseId}/preview`);
     return response.data;
+  }
+
+  // ========== 作业管理 ==========
+
+  /**
+   * 为小节创建作业
+   */
+  async createHomework(chapterId: number, data: HomeworkCreate): Promise<Homework> {
+    const response = await apiClient.post<Homework>(`/course-outline/chapters/${chapterId}/homeworks`, data);
+    return response.data;
+  }
+
+  /**
+   * 更新作业
+   */
+  async updateHomework(homeworkId: number, data: HomeworkUpdate): Promise<Homework> {
+    const response = await apiClient.put<Homework>(`/course-outline/homeworks/${homeworkId}`, data);
+    return response.data;
+  }
+
+  /**
+   * 删除作业
+   */
+  async deleteHomework(homeworkId: number): Promise<void> {
+    await apiClient.delete(`/course-outline/homeworks/${homeworkId}`);
   }
 }
 

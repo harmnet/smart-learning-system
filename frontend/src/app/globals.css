@@ -168,6 +168,35 @@
     animation: slide-in-right 0.3s ease-out;
   }
 
+  /* 慢速旋转动画 */
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+  }
+
+  /* 渐变文字动画 */
+  @keyframes gradient-text {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient-text {
+    background-size: 200% auto;
+    animation: gradient-text 3s ease infinite;
+  }
+
   /* 强制隐藏所有 select 元素的原生下拉箭头 */
   select,
   select:focus,

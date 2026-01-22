@@ -130,12 +130,10 @@ async def toggle_llm_config(
     # 如果要启用该配置，则禁用所有其他配置
     if not config.is_active:
         # 禁用所有其他配置
-        await db.execute(
+        other_configs_result = await db.execute(
             select(LLMConfig).where(LLMConfig.id != config_id)
         )
-        other_configs = (await db.execute(
-            select(LLMConfig).where(LLMConfig.id != config_id)
-        )).scalars().all()
+        other_configs = other_configs_result.scalars().all()
         
         for other_config in other_configs:
             other_config.is_active = False

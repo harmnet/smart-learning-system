@@ -276,6 +276,23 @@ async def create_student(
 
     return {"id": user.id, "message": "Student created successfully"}
 
+@router.get("/students/template")
+async def download_student_template():
+    """下载学生导入模板"""
+    headers = ["姓名", "学号", "用户名", "手机号", "邮箱（可选）", "所属班级ID"]
+    sample_data = [
+        {"姓名": "张三", "学号": "2024001", "用户名": "zhangsan", "手机号": "13800138001", "邮箱（可选）": "zhangsan@example.com", "所属班级ID": "1"},
+        {"姓名": "李四", "学号": "2024002", "用户名": "lisi", "手机号": "13800138002", "邮箱（可选）": "", "所属班级ID": "1"},
+    ]
+    
+    template_bytes = generate_excel_template(headers, sample_data)
+    
+    return Response(
+        content=template_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=student_import_template.xlsx"}
+    )
+
 @router.get("/students/{student_id}", response_model=user_schemas.User)
 async def get_student(
     student_id: int,
@@ -385,24 +402,7 @@ async def delete_student(
     student.is_active = False
     student.updated_at = datetime.utcnow()
     await db.commit()
-    return {"message": "Student deleted successfully"}
-
-@router.get("/students/template")
-async def download_student_template():
-    """下载学生导入模板"""
-    headers = ["姓名", "学号", "用户名", "手机号", "邮箱（可选）", "所属班级ID"]
-    sample_data = [
-        {"姓名": "张三", "学号": "2024001", "用户名": "zhangsan", "手机号": "13800138001", "邮箱（可选）": "zhangsan@example.com", "所属班级ID": "1"},
-        {"姓名": "李四", "学号": "2024002", "用户名": "lisi", "手机号": "13800138002", "邮箱（可选）": "", "所属班级ID": "1"},
-    ]
-    
-    template_bytes = generate_excel_template(headers, sample_data)
-    
-    return Response(
-        content=template_bytes,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=student_import_template.xlsx"}
-    )
+    return {"message": "Student deleted successfully", "id": student_id}
 
 @router.post("/students/import")
 async def import_students(
@@ -817,7 +817,7 @@ async def delete_teacher(
     user.is_active = False
     user.updated_at = datetime.utcnow()
     await db.commit()
-    return {"message": "Teacher deleted successfully"}
+    return {"message": "Teacher deleted successfully", "id": teacher_id}
 
 @router.get("/teachers/template")
 async def download_teacher_template():
@@ -1288,7 +1288,7 @@ async def delete_class(
     class_obj.updated_at = datetime.utcnow()
     await db.commit()
     
-    return {"message": "Class deleted successfully"}
+    return {"message": "Class deleted successfully", "id": class_id}
 
 @router.get("/classes/template")
 async def download_class_template():

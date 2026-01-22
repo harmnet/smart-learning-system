@@ -75,6 +75,7 @@ export const zh = {
     gradeManagement: '成绩管理',
     grading: '批改作业',
     llmConfigs: 'LLM管理',
+    llmCallLogs: 'LLM调用记录',
   },
   admin: {
     dashboard: {

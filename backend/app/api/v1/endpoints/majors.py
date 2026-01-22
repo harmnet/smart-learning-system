@@ -135,6 +135,23 @@ async def read_majors(
         "limit": limit
     }
 
+@router.get("/template")
+async def download_major_template():
+    """下载专业导入模板"""
+    headers = ["专业名称", "所属组织ID", "学费", "学制（年）", "专业描述（可选）"]
+    sample_data = [
+        {"专业名称": "计算机科学与技术", "所属组织ID": "1", "学费": "5000.00", "学制（年）": "4", "专业描述（可选）": "计算机相关专业"},
+        {"专业名称": "软件工程", "所属组织ID": "1", "学费": "5500.00", "学制（年）": "4", "专业描述（可选）": ""},
+    ]
+    
+    template_bytes = generate_excel_template(headers, sample_data)
+    
+    return Response(
+        content=template_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=major_import_template.xlsx"}
+    )
+
 @router.get("/{major_id}")
 async def get_major(
     major_id: int,
@@ -286,24 +303,7 @@ async def delete_major(
     major.updated_at = datetime.utcnow()
     await db.commit()
     
-    return {"message": "Major deleted successfully"}
-
-@router.get("/template")
-async def download_major_template():
-    """下载专业导入模板"""
-    headers = ["专业名称", "所属组织ID", "学费", "学制（年）", "专业描述（可选）"]
-    sample_data = [
-        {"专业名称": "计算机科学与技术", "所属组织ID": "1", "学费": "5000.00", "学制（年）": "4", "专业描述（可选）": "计算机相关专业"},
-        {"专业名称": "软件工程", "所属组织ID": "1", "学费": "5500.00", "学制（年）": "4", "专业描述（可选）": ""},
-    ]
-    
-    template_bytes = generate_excel_template(headers, sample_data)
-    
-    return Response(
-        content=template_bytes,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=major_import_template.xlsx"}
-    )
+    return {"message": "Major deleted successfully", "id": major_id}
 
 @router.post("/import")
 async def import_majors(

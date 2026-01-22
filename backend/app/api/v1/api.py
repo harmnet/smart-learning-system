@@ -1,7 +1,8 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning, upload, llm_call_logs
 
 api_router = APIRouter()
+api_router.include_router(upload.router, prefix="/upload", tags=["upload"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(organizations.router, prefix="/organizations", tags=["organizations"])
 api_router.include_router(majors.router, prefix="/majors", tags=["majors"])
@@ -22,6 +23,7 @@ api_router.include_router(students.router, prefix="/student", tags=["students"])
 api_router.include_router(teachers.router, prefix="/teacher", tags=["teachers"])
 api_router.include_router(course_outline.router, prefix="/course-outline", tags=["course-outline"])
 api_router.include_router(llm_configs.router, prefix="/admin/llm-configs", tags=["llm-configs"])
+api_router.include_router(llm_call_logs.router, prefix="/admin/llm-call-logs", tags=["llm-call-logs"])
 api_router.include_router(admin_dashboard.router, prefix="/admin/dashboard", tags=["admin-dashboard"])
 api_router.include_router(student_learning.router, prefix="/student/learning", tags=["student-learning"])
 api_router.include_router(student_home.router, prefix="/student/home", tags=["student-home"])

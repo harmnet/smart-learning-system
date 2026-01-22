@@ -20,6 +20,7 @@ from app.schemas.learning_profile import (
     AssessmentHistoryResponse
 )
 from app.api.v1.endpoints.students import get_current_user
+from app.utils.llm_call_logger import log_llm_call
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -128,7 +129,23 @@ async def submit_assessment(
 
         # 4. 调用LLM生成评价
         logger.info(f"调用LLM生成评价，使用配置: {llm_config.provider_name}")
-        ai_evaluation = await call_llm_api(llm_config, prompt)
+        ai_evaluation = None
+        async with log_llm_call(
+            db=db,
+            function_type="learning_profile_assessment",
+            user_id=current_user.id,
+            user_role=current_user.role,
+            llm_config_id=llm_config.id,
+            prompt=prompt,
+            related_type="learning_assessment"
+        ) as log_context:
+            try:
+                ai_evaluation = await call_llm_api(llm_config, prompt)
+                log_context.set_result(ai_evaluation, status='success')
+            except Exception as e:
+                logger.error(f"LLM调用失败: {str(e)}", exc_info=True)
+                log_context.set_result(None, status='failed', error_message=str(e))
+                raise
 
         # 5. 提取标签和评价内容
         tags = []

@@ -6,6 +6,8 @@ import os
 import tempfile
 import logging
 from typing import Optional
+import httpx
+from app.core.config import settings
 from app.models.teaching_resource import TeachingResource
 from app.utils.oss_client import oss_client
 
@@ -77,6 +79,72 @@ async def download_and_parse_resource(resource: TeachingResource) -> str:
     except Exception as e:
         logger.error(f"解析资源文件失败: {e}")
         raise Exception(f"解析资源文件失败: {str(e)}")
+
+
+async def download_and_parse_file_url(file_url: str, resource_type: str, original_filename: Optional[str] = None) -> str:
+    try:
+        suffix = get_file_suffix(resource_type, original_filename or "")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        download_success = False
+        normalized_url = (file_url or "").strip()
+
+        def extract_oss_key(url: str) -> Optional[str]:
+            if '.aliyuncs.com/' in url:
+                parts = url.split('.aliyuncs.com/')
+                if len(parts) > 1:
+                    return parts[1].split('?')[0]
+            if settings.OSS_USE_CNAME and settings.OSS_ENDPOINT:
+                if url.startswith(settings.OSS_ENDPOINT):
+                    return url.replace(settings.OSS_ENDPOINT + '/', '').split('?')[0]
+            return None
+
+        if normalized_url.startswith('http://') or normalized_url.startswith('https://'):
+            oss_key = extract_oss_key(normalized_url)
+            if oss_key and oss_client.enabled:
+                result = oss_client.bucket.get_object(oss_key)
+                with open(temp_path, 'wb') as f:
+                    f.write(result.read())
+                download_success = True
+            else:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.get(normalized_url)
+                    response.raise_for_status()
+                    with open(temp_path, 'wb') as f:
+                        f.write(response.content)
+                download_success = True
+        else:
+            object_key = normalized_url.lstrip('/')
+            if object_key and oss_client.enabled and oss_client.file_exists(object_key):
+                result = oss_client.bucket.get_object(object_key)
+                with open(temp_path, 'wb') as f:
+                    f.write(result.read())
+                download_success = True
+            elif normalized_url and os.path.exists(normalized_url):
+                with open(normalized_url, 'rb') as src:
+                    with open(temp_path, 'wb') as dst:
+                        dst.write(src.read())
+                download_success = True
+
+        if not download_success:
+            raise Exception("文件下载失败")
+
+        text_content = parse_file_by_type(temp_path, resource_type)
+
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+
+        if len(text_content) > MAX_TEXT_LENGTH:
+            text_content = text_content[:MAX_TEXT_LENGTH] + "\n\n...(内容过长，已截取)"
+
+        return text_content
+    except Exception as e:
+        logger.error(f"解析文件失败: {e}")
+        raise Exception(f"解析文件失败: {str(e)}")
 
 
 def get_file_suffix(resource_type: str, original_filename: str) -> str:

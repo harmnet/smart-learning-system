@@ -27,6 +27,7 @@ class OSSService:
             endpoint = f"https://oss-{settings.OSS_REGION}.aliyuncs.com"
         
         # 创建Bucket实例 (V4签名需要指定region)
+        # 注意：不使用 is_cname 参数以兼容不同版本的oss2
         self.bucket = oss2.Bucket(
             auth,
             endpoint,
@@ -34,10 +35,6 @@ class OSSService:
             connect_timeout=30,
             region=settings.OSS_REGION  # V4签名必须指定region
         )
-        
-        # 配置CNAME
-        if settings.OSS_USE_CNAME:
-            self.bucket.enable_cname()
     
     def upload_file(
         self,

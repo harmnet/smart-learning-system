@@ -9,6 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
 import Modal from '@/components/common/Modal';
 import Toast from '@/components/common/Toast';
+import WebOfficePreview from '@/components/teacher/WebOfficePreview';
 
 export default function TeachingResourcesPage() {
   const { t } = useLanguage();
@@ -48,6 +49,8 @@ export default function TeachingResourcesPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [resourceName, setResourceName] = useState('');
   const [knowledgePoint, setKnowledgePoint] = useState<string>('');
+  const [webOfficePreviewOpen, setWebOfficePreviewOpen] = useState(false);
+  const [previewResource, setPreviewResource] = useState<TeachingResource | null>(null);
   const [resourceFolderId, setResourceFolderId] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -514,34 +517,16 @@ export default function TeachingResourcesPage() {
   };
 
   // WebOffice预览
-  const handleWebOfficePreview = async (resource: TeachingResource) => {
+  const handleWebOfficePreview = (resource: TeachingResource) => {
     const supportedTypes = ['word', 'excel', 'ppt', 'pdf'];
     if (!supportedTypes.includes(resource.resource_type.toLowerCase())) {
       setToast({ message: '该文件类型不支持在线预览', type: 'warning' });
       return;
     }
     
-    try {
-      setToast({ message: '正在生成预览链接...', type: 'info' });
-      
-      const result = await teachingResourceService.getWebOfficePreviewUrl(resource.id, {
-        expires: 3600,
-        allow_export: true,
-        allow_print: true,
-        watermark: '内部资料'
-      });
-      
-      if (result.success && result.preview_url) {
-        window.open(result.preview_url, '_blank');
-        setToast({ message: '预览链接已生成', type: 'success' });
-      } else {
-        setToast({ message: '生成预览链接失败', type: 'error' });
-      }
-    } catch (error: any) {
-      console.error('Failed to get WebOffice preview URL:', error);
-      const errorMsg = error.response?.data?.detail || error.message || '生成预览链接失败';
-      setToast({ message: errorMsg, type: 'error' });
-    }
+    // 打开WebOffice预览Modal
+    setPreviewResource(resource);
+    setWebOfficePreviewOpen(true);
   };
 
   // 渲染文件夹下拉选项（带缩进）
@@ -1175,6 +1160,19 @@ export default function TeachingResourcesPage() {
           />
         )}
       </div>
+
+      {/* WebOffice预览Modal */}
+      {previewResource && (
+        <WebOfficePreview
+          isOpen={webOfficePreviewOpen}
+          onClose={() => {
+            setWebOfficePreviewOpen(false);
+            setPreviewResource(null);
+          }}
+          resourceId={previewResource.id}
+          resourceName={previewResource.resource_name}
+        />
+      )}
     </TeacherLayout>
   );
 }

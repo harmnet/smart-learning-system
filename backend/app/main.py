@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, ORJSONResponse
@@ -35,7 +35,29 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "detail": exc.errors(),
             "body": str(exc.body) if exc.body else None
+        },
+        headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': '*',
         }
+    )
+
+# HTTPException异常处理（确保CORS头）
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # 合并CORS headers和HTTPException的headers
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+    }
+    if exc.headers:
+        headers.update(exc.headers)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
     )
 
 # 全局异常处理
@@ -47,6 +69,11 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "detail": f"内部服务器错误: {str(exc)}",
             "type": type(exc).__name__
+        },
+        headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': '*',
         }
     )
 

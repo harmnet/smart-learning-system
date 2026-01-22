@@ -77,6 +77,7 @@ export const en: Translations = {
     learningAnalytics: 'Learning Analysis',
     gradeManagement: 'Grade Management',
     llmConfigs: 'LLM Management',
+    llmCallLogs: 'LLM Call Logs',
   },
   admin: {
     dashboard: {

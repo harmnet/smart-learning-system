@@ -43,9 +43,13 @@ class Settings(BaseSettings):
     OSS_ACCESS_KEY_ID: str = ""
     OSS_ACCESS_KEY_SECRET: str = ""
     OSS_BUCKET_NAME: str = "ezijingai"
-    OSS_REGION: str = "cn-hangzhou"  # 默认华东1（杭州），请根据实际Bucket地域修改
+    OSS_REGION: str = "cn-beijing"  # 华北2（北京）- IMM项目所在区域
     OSS_ENDPOINT: str = ""  # 可选：自定义域名，例如 https://static.example.com
     OSS_USE_CNAME: bool = False  # 是否使用自定义域名
+    
+    # Aliyun IMM (Intelligent Media Management) Configuration
+    IMM_PROJECT_NAME: str = "lls"  # IMM项目名称
+    IMM_SERVICE_ROLE: str = ""  # 可选：IMM服务角色ARN（如果使用RAM角色访问OSS）
 
     # Banana-Slides PPT服务配置
     BANANA_SLIDES_API_URL: str = "http://localhost:5002"
@@ -57,4 +61,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+print(f"DEBUG: Loaded settings. OSS_ACCESS_KEY_ID={settings.OSS_ACCESS_KEY_ID}, CNAME={settings.OSS_USE_CNAME}, ENDPOINT={settings.OSS_ENDPOINT}")
 

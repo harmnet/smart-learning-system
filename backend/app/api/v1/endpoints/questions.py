@@ -20,6 +20,9 @@ from app.models.base import User
 from app.models.question import Question, QuestionOption
 from app.models.llm_config import LLMConfig
 from app.models.teaching_resource import TeachingResource
+from app.api.v1.endpoints.teachers import get_current_user
+from app.utils.llm_call_logger import log_llm_call
+from fastapi import Depends
 import logging
 
 logger = logging.getLogger(__name__)
@@ -796,6 +799,7 @@ class AIGenerateQuestionResponse(BaseModel):
 async def ai_generate_question(
     request: AIGenerateQuestionRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     使用AI生成题目
@@ -929,21 +933,43 @@ async def ai_generate_question(
 2. 题干应该清晰、准确，符合{request.knowledge_point}的知识点要求
 3. 答案应该准确、完整"""
     
+    # 记录LLM调用
+    response_text = None
+    async with log_llm_call(
+        db=db,
+        function_type="ai_generate_question",
+        user_id=current_user.id,
+        user_role=current_user.role,
+        llm_config_id=config.id,
+        prompt=prompt_template,
+        related_id=request.resource_id,
+        related_type="teaching_resource"
+    ) as log_context:
+        try:
+            # 调用LLM API
+            provider_key = config.provider_key
+            
+            if provider_key == "aliyun_qwen":
+                response_text = await call_aliyun_qwen(config, prompt_template)
+            elif provider_key == "deepseek" or provider_key == "kimi" or provider_key == "volcengine_doubao" or provider_key == "siliconflow":
+                response_text = await call_openai_compatible(config, prompt_template)
+            elif provider_key == "wenxin":
+                response_text = await call_wenxin(config, prompt_template)
+            else:
+                error_msg = f"不支持的LLM提供商: {provider_key}"
+                log_context.set_result(None, status='failed', error_message=error_msg)
+                return AIGenerateQuestionResponse(
+                    success=False,
+                    error=error_msg
+                )
+            
+            log_context.set_result(response_text, status='success')
+        except Exception as e:
+            logger.error(f"LLM调用失败: {e}", exc_info=True)
+            log_context.set_result(None, status='failed', error_message=str(e))
+            raise
+    
     try:
-        # 调用LLM API
-        provider_key = config.provider_key
-        
-        if provider_key == "aliyun_qwen":
-            response_text = await call_aliyun_qwen(config, prompt_template)
-        elif provider_key == "deepseek" or provider_key == "kimi" or provider_key == "volcengine_doubao" or provider_key == "siliconflow":
-            response_text = await call_openai_compatible(config, prompt_template)
-        elif provider_key == "wenxin":
-            response_text = await call_wenxin(config, prompt_template)
-        else:
-            return AIGenerateQuestionResponse(
-                success=False,
-                error=f"不支持的LLM提供商: {provider_key}"
-            )
         
         # 解析返回的JSON
         # 尝试提取JSON（可能包含markdown代码块）
