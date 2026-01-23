@@ -2,14 +2,14 @@ FROM node:18-alpine AS deps
 
 WORKDIR /app
 
-# 配置阿里云镜像源并安装依赖
+# 配置阿里云镜像源并安装依赖（针对Linux环境）
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
     apk update && \
-    apk add --no-cache libc6-compat
+    apk add --no-cache libc6-compat python3 make g++
 
 # 安装npm依赖
 COPY package.json package-lock.json* ./
-RUN npm ci --registry=https://registry.npmmirror.com
+RUN npm ci --registry=https://registry.npmmirror.com --platform=linux --arch=x64
 
 # 构建阶段
 FROM node:18-alpine AS builder
@@ -18,7 +18,8 @@ WORKDIR /app
 
 # 配置镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
-    apk update
+    apk update && \
+    apk add --no-cache libc6-compat python3 make g++
 
 # 复制依赖
 COPY --from=deps /app/node_modules ./node_modules
@@ -29,7 +30,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Next.js 收集匿名遥测数据，禁用它
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # 构建应用
 RUN npm run build
@@ -43,7 +44,8 @@ WORKDIR /app
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
     apk update
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # 创建用户
 RUN addgroup --system --gid 1001 nodejs
@@ -62,6 +64,6 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
 CMD ["node", "server.js"]

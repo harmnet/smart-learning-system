@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning, upload, llm_call_logs
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning, upload, llm_call_logs, course_qa
 
 api_router = APIRouter()
 api_router.include_router(upload.router, prefix="/upload", tags=["upload"])
@@ -31,6 +31,8 @@ api_router.include_router(student_exams.router, prefix="/student", tags=["studen
 api_router.include_router(student_interactions.router, prefix="/student", tags=["student-interactions"])
 api_router.include_router(learning_profile.router, prefix="/student/learning-profile", tags=["learning-profile"])
 api_router.include_router(personalized_learning.router, prefix="/student/personalized-learning", tags=["personalized-learning"])
+api_router.include_router(course_qa.router, prefix="/student", tags=["course-qa"])
+api_router.include_router(course_qa.router, prefix="/teacher", tags=["course-qa"])
 api_router.include_router(ai_creation.router, prefix="/teacher/ai-creation", tags=["ai-creation"])
 api_router.include_router(ppt_creation.router, prefix="/teacher/ppt-creation", tags=["ppt-creation"])
 

@@ -13,6 +13,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"  # 使用5433避免与其他应用冲突
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -26,11 +28,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: smartlearning-redis
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --port 6380
     volumes:
       - redis_data:/data
+    ports:
+      - "6380:6380"  # 使用6380避免与其他应用冲突
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -43,15 +47,16 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: smartlearning-backend:latest
     container_name: smartlearning-backend
     environment:
       - POSTGRES_SERVER=${POSTGRES_SERVER:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Q1W2E3R4T5Y6}
       - POSTGRES_DB=${POSTGRES_DB:-smartlearning}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_PORT=5432
       - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PORT=6380
       - SECRET_KEY=${SECRET_KEY}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
       - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
@@ -61,6 +66,8 @@ services:
       - IMM_PROJECT_NAME=${IMM_PROJECT_NAME:-lls}
     volumes:
       - backend_uploads:/app/uploads
+    ports:
+      - "8001:8000"  # 使用8001避免与其他应用冲突
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,6 +89,8 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://smarteduonline.cn/api/v1
+    ports:
+      - "3001:3000"  # 使用3001避免与其他应用冲突
     depends_on:
       - backend
     networks:
@@ -93,11 +102,12 @@ services:
     image: nginx:alpine
     container_name: smartlearning-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"     # HTTP使用8080避免冲突
+      - "8443:443"    # HTTPS使用8443避免冲突
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_logs:/var/log/nginx
+      - /root/ssl:/etc/nginx/ssl:ro  # SSL证书路径
     depends_on:
       - frontend
       - backend
@@ -114,4 +124,3 @@ volumes:
 networks:
   smart-learning-network:
     driver: bridge
-

@@ -128,94 +128,77 @@ export default function StudentHomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-100 via-blue-50 to-pink-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-violet-200 border-t-violet-600 mx-auto"></div>
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-20 blur-xl animate-pulse"></div>
-          </div>
-          <p className="mt-6 text-slate-700 font-medium">{t.common.loading}</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600 font-medium">{t.common.loading}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-100 via-blue-50 to-pink-100 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-violet-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute top-40 right-10 w-72 h-72 bg-fuchsia-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
-      </div>
-      {/* Header with Glassmorphism */}
-      <header className="relative backdrop-blur-xl bg-white/70 border-b border-white/20 shadow-lg shadow-violet-100/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+    <div className="min-h-screen bg-slate-50 relative">
+      {/* Subtle Background Pattern */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/30 pointer-events-none"></div>
+      
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200/80 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo and Title */}
-            <div className="flex items-center gap-4">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl blur-md opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative w-12 h-12 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center shadow-lg transform group-hover:scale-105 transition-transform">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
-                  Smart Learning
-                </h1>
-                <p className="text-xs text-slate-600 font-medium">{t.student.home.welcomeMessage}</p>
+                <h1 className="text-xl font-bold text-slate-900">Smart Learning</h1>
+                <p className="text-xs text-slate-500">{t.student.home.welcomeMessage}</p>
               </div>
             </div>
 
-            {/* Center: Stats with Glass Effect */}
-            <div className="flex items-center gap-4">
+            {/* Center: Stats */}
+            <div className="hidden md:flex items-center gap-6">
               {dashboard && (
                 <>
-                  <div className="group relative backdrop-blur-md bg-gradient-to-br from-violet-500/10 to-violet-600/10 hover:from-violet-500/20 hover:to-violet-600/20 rounded-2xl px-6 py-3 border border-violet-200/50 transition-all duration-300 hover:scale-105 hover:shadow-lg">
-                    <div className="text-3xl font-bold bg-gradient-to-br from-violet-600 to-violet-800 bg-clip-text text-transparent">
-                      {dashboard.stats.total_courses}
-                    </div>
-                    <div className="text-xs text-slate-600 font-medium mt-1">{t.student.home.learningStats.totalCourses}</div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-slate-900">{dashboard.stats.total_courses}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{t.student.home.learningStats.totalCourses}</div>
                   </div>
-                  <div className="group relative backdrop-blur-md bg-gradient-to-br from-fuchsia-500/10 to-pink-600/10 hover:from-fuchsia-500/20 hover:to-pink-600/20 rounded-2xl px-6 py-3 border border-fuchsia-200/50 transition-all duration-300 hover:scale-105 hover:shadow-lg">
-                    <div className="text-3xl font-bold bg-gradient-to-br from-fuchsia-600 to-pink-600 bg-clip-text text-transparent">
-                      {dashboard.stats.in_progress_courses}
-                    </div>
-                    <div className="text-xs text-slate-600 font-medium mt-1">{t.student.home.learningStats.inProgressCourses}</div>
+                  <div className="w-px h-8 bg-slate-200"></div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{dashboard.stats.in_progress_courses}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{t.student.home.learningStats.inProgressCourses}</div>
                   </div>
                 </>
               )}
             </div>
 
             {/* Right: User Info and Logout */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {userInfo && (
-                <div className="flex items-center gap-3 backdrop-blur-md bg-white/50 rounded-2xl px-4 py-2 border border-white/50">
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-slate-900">{userInfo.full_name || userInfo.username}</div>
-                    <div className="text-xs text-slate-600 font-medium">
+                <div className="hidden sm:flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">
+                      {(userInfo.full_name || userInfo.username || 'S').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{userInfo.full_name || userInfo.username}</div>
+                    <div className="text-xs text-slate-500">
                       {dashboard?.class_info ? dashboard.class_info.class_name : t.student.home.welcome}
                     </div>
                   </div>
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full blur-sm opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="relative w-11 h-11 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center shadow-lg">
-                      <span className="text-white font-bold">
-                        {(userInfo.full_name || userInfo.username || 'S').charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                </div>
                 </div>
               )}
-                <button
-                  onClick={handleLogout}
-                className="group relative px-5 py-2.5 text-sm font-semibold text-slate-700 hover:text-red-600 backdrop-blur-md bg-white/50 hover:bg-red-50/80 rounded-xl border border-white/50 hover:border-red-200 transition-all duration-300 hover:scale-105 hover:shadow-lg"
-                >
-                <span className="relative z-10">{t.student.home.logout}</span>
-                </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-red-600 bg-white hover:bg-red-50 rounded-lg border border-slate-200 hover:border-red-200 transition-colors duration-200 cursor-pointer"
+              >
+                {t.student.home.logout}
+              </button>
             </div>
           </div>
         </div>
@@ -226,170 +209,111 @@ export default function StudentHomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - 70% */}
           <div className="lg:col-span-2 space-y-6">
-            {/* 我的课程 - Bento Grid Style */}
-            <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-8 shadow-xl shadow-violet-100/50 hover:shadow-2xl hover:shadow-violet-200/50 transition-all duration-500">
-              {/* Gradient Border Effect */}
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-violet-500/20 via-transparent to-fuchsia-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-              
-              <div className="relative flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl blur-md opacity-50"></div>
-                    <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
-                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                    </div>
-                  </div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent">
-                    {t.student.home.courses.title}
-                  </h2>
-        </div>
+            {/* 我的课程 */}
+            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  {t.student.home.courses.title}
+                </h2>
               </div>
               
               {dashboard && dashboard.my_courses.length > 0 ? (
-                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {dashboard.my_courses.map((course, index) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {dashboard.my_courses.map((course) => (
                     <div
                       key={course.id}
                       onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group relative backdrop-blur-md bg-gradient-to-br from-white/90 to-white/70 rounded-2xl p-5 border border-white/50 hover:border-violet-300/50 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden"
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="group bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
                     >
-                      {/* Hover Gradient Background */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/0 via-fuchsia-500/0 to-pink-500/0 group-hover:from-violet-500/10 group-hover:via-fuchsia-500/10 group-hover:to-pink-500/10 transition-all duration-500 rounded-2xl"></div>
-                      
-                      {/* 悬停显示学习数据 */}
-                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-md bg-gradient-to-br from-blue-50/95 to-violet-50/95 rounded-xl p-3 shadow-lg border border-violet-200/50 z-10">
-                        <div className="text-xs font-semibold text-violet-700 mb-1.5">学习统计</div>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="text-xs text-slate-700 font-medium">
-                              {course.study_minutes ? `${Math.round(course.study_minutes)} 分钟` : '未学习'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="text-xs text-slate-700 font-medium">
-                              学习 {course.study_count || 0} 次
-                            </span>
-              </div>
-            </div>
-          </div>
-          
-                      <div className="relative flex gap-5">
+                      <div className="flex gap-4">
                         {(course.cover_image || course.cover_id) ? (
-                          <div className="relative flex-shrink-0 group-hover:scale-105 transition-transform duration-500">
-                            <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-500"></div>
-                            <img
-                              src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
-                              alt={course.title}
-                              className="relative w-24 h-24 rounded-2xl object-cover ring-2 ring-white/50 group-hover:ring-violet-300 transition-all duration-500"
-                            />
-                          </div>
+                          <img
+                            src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
+                            alt={course.title}
+                            className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                          />
                         ) : (
-                          <div className="relative flex-shrink-0 w-24 h-24 rounded-2xl bg-gradient-to-br from-violet-400 via-fuchsia-400 to-pink-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-500">
-                            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                             </svg>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-900 truncate group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-violet-600 group-hover:to-fuchsia-600 group-hover:bg-clip-text transition-all duration-300 text-lg">
+                          <h3 className="font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
                             {course.title}
                           </h3>
                           {course.code && (
                             <div className="text-xs text-slate-500 font-mono mt-0.5">{course.code}</div>
                           )}
-                          
-                          <div className="flex flex-wrap items-center gap-2 mt-3">
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             {course.teacher_name && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-violet-50/80 px-2.5 py-1 rounded-lg">
-                                <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="flex items-center gap-1 text-xs text-slate-600">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
-                                <span className="text-xs font-medium text-violet-700">{course.teacher_name}</span>
+                                <span>{course.teacher_name}</span>
                               </div>
                             )}
                             {course.credits && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-fuchsia-50/80 px-2.5 py-1 rounded-lg">
-                                <svg className="w-3.5 h-3.5 text-fuchsia-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                </svg>
-                                <span className="text-xs font-medium text-fuchsia-700">{course.credits} 学分</span>
-                              </div>
-                            )}
-                            {course.course_type && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-blue-50/80 px-2.5 py-1 rounded-lg">
-                                <span className="text-xs font-medium text-blue-700">{course.course_type}</span>
-                              </div>
-                            )}
-                            {course.is_public !== undefined && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-green-50/80 px-2.5 py-1 rounded-lg">
-                                <span className="text-xs font-medium text-green-700">
-                                  {course.is_public ? '公开课' : '私有课'}
-                                </span>
-                              </div>
-                            )}
-                            {course.major_name && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-amber-50/80 px-2.5 py-1 rounded-lg">
-                                <span className="text-xs font-medium text-amber-700">{course.major_name}</span>
+                              <div className="text-xs text-slate-500">
+                                {course.credits} 学分
                               </div>
                             )}
                           </div>
+                          {(course.study_minutes || course.study_count) && (
+                            <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                              {course.study_minutes && (
+                                <span>{Math.round(course.study_minutes)} 分钟</span>
+                              )}
+                              {course.study_count && (
+                                <span>学习 {course.study_count} 次</span>
+                              )}
+                            </div>
+                          )}
                         </div>
-              </div>
-            </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                   <p className="text-slate-600">{t.student.home.courses.noCourses}</p>
-          </div>
+                </div>
               )}
             </section>
 
             {/* 我的考试 */}
-            <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-8 shadow-xl shadow-blue-100/50 hover:shadow-2xl hover:shadow-blue-200/50 transition-all duration-500">
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-blue-500/20 via-transparent to-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-              
-              <div className="relative flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl blur-md opacity-50"></div>
-                    <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg">
-                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-cyan-600 bg-clip-text text-transparent">{t.student.home.myExams.title}</h2>
+            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
+                <h2 className="text-xl font-bold text-slate-900">{t.student.home.myExams.title}</h2>
               </div>
               
               {exams.length > 0 ? (
-                <div className="relative space-y-4">
-                  {exams.slice(0, 5).map((exam, index) => (
+                <div className="space-y-3">
+                  {exams.slice(0, 5).map((exam) => (
                     <div
                       key={exam.id}
-                      className="group relative backdrop-blur-md bg-gradient-to-br from-white/90 to-white/70 rounded-2xl p-5 border border-white/50 hover:border-blue-300/50 shadow-md hover:shadow-xl transition-all duration-500 overflow-hidden"
-                      style={{ animationDelay: `${index * 80}ms` }}
+                      className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all duration-200"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-cyan-500/0 to-teal-500/0 group-hover:from-blue-500/5 group-hover:via-cyan-500/5 group-hover:to-teal-500/5 transition-all duration-500"></div>
-                      
-                      <div className="relative flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-3">
-                            <h3 className="font-bold text-slate-900 text-lg group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-cyan-600 group-hover:bg-clip-text transition-all duration-300">{exam.exam_name}</h3>
-                            <span className={`px-3 py-1.5 rounded-xl text-xs font-bold ${getExamStatusColor(exam.status)} shadow-sm`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-slate-900 truncate">{exam.exam_name}</h3>
+                            <span className={`px-2 py-1 rounded-md text-xs font-medium ${getExamStatusColor(exam.status)}`}>
                               {getExamStatusText(exam.status)}
                             </span>
                           </div>
@@ -402,56 +326,29 @@ export default function StudentHomePage() {
                                 <span>{exam.course_name}</span>
                               </div>
                             )}
-                            {(exam.chapter_name || exam.section_name) && (
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                <span>{exam.chapter_name}{exam.section_name ? ` / ${exam.section_name}` : ''}</span>
-            </div>
-                            )}
-                            <div className="flex items-center gap-4 flex-wrap">
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span className="font-medium text-slate-700">
-                                  {new Date(exam.start_time).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>{studentHomeService.formatTimeRemaining(exam.start_time, exam.end_time)}</span>
-          </div>
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-fuchsia-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                <span>{exam.duration} {t.student.home.myExams.minutes}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-                        <button
-                          onClick={() => handleStartExam(exam)}
-                          disabled={exam.status !== 'in_progress'}
-                          className={`ml-4 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            exam.status === 'in_progress'
-                              ? 'bg-blue-600 text-white hover:bg-blue-700'
-                              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                          }`}
-                        >
-                          {exam.status === 'in_progress' ? t.student.home.myExams.startExam : t.student.home.myExams.viewExam}
-                        </button>
-                  </div>
+                            <div className="flex items-center gap-4 flex-wrap text-xs">
+                              <span className="text-slate-500">
+                                {new Date(exam.start_time).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                              </span>
+                              <span className="text-slate-500">{exam.duration} {t.student.home.myExams.minutes}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {exam.status === 'in_progress' && (
+                          <button
+                            onClick={() => handleStartExam(exam)}
+                            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-200 cursor-pointer flex-shrink-0"
+                          >
+                            {t.student.home.myExams.startExam}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
               ) : (
                 <div className="text-center py-12">
-                  <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <p className="text-slate-600">{t.student.home.myExams.noExams}</p>
@@ -461,162 +358,92 @@ export default function StudentHomePage() {
 
             {/* 你可能感兴趣的课程 */}
             {dashboard && dashboard.recommended_courses.length > 0 && (
-              <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-8 shadow-xl shadow-green-100/50 hover:shadow-2xl hover:shadow-green-200/50 transition-all duration-500">
-                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                
-                <div className="relative flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl blur-md opacity-50"></div>
-                      <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-                    </div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-600 bg-clip-text text-transparent">{t.student.home.recommended.title}</h2>
+              <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
                   </div>
-            </div>
+                  <h2 className="text-xl font-bold text-slate-900">{t.student.home.recommended.title}</h2>
+                </div>
                 
-                <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {dashboard.recommended_courses.map((course, index) => (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {dashboard.recommended_courses.map((course) => (
                     <div
                       key={course.id}
                       onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group relative backdrop-blur-md bg-gradient-to-br from-white/90 to-white/70 rounded-2xl p-5 border border-white/50 hover:border-green-300/50 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden hover:-translate-y-2"
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="group bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all duration-200 cursor-pointer"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-emerald-500/0 group-hover:from-green-500/10 group-hover:to-emerald-500/10 transition-all duration-500"></div>
-                      
                       {(course.cover_image || course.cover_id) ? (
-                        <div className="relative mb-4 overflow-hidden rounded-2xl group-hover:scale-105 transition-transform duration-500">
-                          <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 z-10"></div>
-                          <img
-                            src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
-                            alt={course.title}
-                            className="w-full h-36 rounded-2xl object-cover ring-2 ring-white/50"
-                          />
-            </div>
-          ) : (
-                        <div className="relative w-full h-36 rounded-2xl bg-gradient-to-br from-green-400 via-emerald-400 to-teal-500 flex items-center justify-center mb-4 shadow-lg group-hover:scale-105 transition-transform duration-500">
-                          <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                          </svg>
-            </div>
-          )}
-                      <div className="relative">
-                        <h3 className="font-bold text-slate-900 truncate text-lg group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-green-600 group-hover:to-emerald-600 group-hover:bg-clip-text transition-all duration-300">{course.title}</h3>
-                        <p className="text-sm text-slate-600 line-clamp-2 mt-2 leading-relaxed">{course.introduction}</p>
-                        <div className="space-y-2 mt-4">
-                          {course.teacher_name && (
-                            <div className="flex items-center gap-2 backdrop-blur-sm bg-green-50/80 px-3 py-1.5 rounded-lg">
-                              <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                              <span className="text-xs font-medium text-green-700">{course.teacher_name}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            {course.credits && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-emerald-50/80 px-2.5 py-1 rounded-lg">
-                                <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                </svg>
-                                <span className="text-xs font-medium text-emerald-700">{course.credits} 学分</span>
-                              </div>
-                            )}
-                            {course.learner_count !== undefined && (
-                              <div className="flex items-center gap-1.5 backdrop-blur-sm bg-blue-50/80 px-2.5 py-1 rounded-lg">
-                                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                <span className="text-xs font-medium text-blue-700">{course.learner_count} 人</span>
-        </div>
-                            )}
-            </div>
-            </div>
-            </div>
-          </div>
-                  ))}
-                </div>
-              </section>
-        )}
-
-            {/* 新上架课程 */}
-            {dashboard && dashboard.new_courses.length > 0 && (
-              <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-8 shadow-xl shadow-rose-100/50 hover:shadow-2xl hover:shadow-rose-200/50 transition-all duration-500">
-                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-rose-500/20 via-transparent to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                
-                <div className="relative flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-rose-500 to-pink-500 rounded-2xl blur-md opacity-50"></div>
-                      <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-lg">
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-700 to-pink-600 bg-clip-text text-transparent">{t.student.home.newCourses.title}</h2>
-                  </div>
-                </div>
-                
-                <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {dashboard.new_courses.map((course, index) => (
-                    <div
-                      key={course.id}
-                      onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group relative backdrop-blur-md bg-gradient-to-br from-white/90 to-white/70 rounded-2xl p-5 border border-white/50 hover:border-rose-300/50 shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden hover:-translate-y-2"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      {/* NEW Badge */}
-                      <div className="absolute top-3 right-3 z-20 backdrop-blur-md bg-gradient-to-r from-rose-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
-                        NEW
-                      </div>
-                      
-                      <div className="absolute inset-0 bg-gradient-to-br from-rose-500/0 to-pink-500/0 group-hover:from-rose-500/10 group-hover:to-pink-500/10 transition-all duration-500"></div>
-                      
-                      {(course.cover_image || course.cover_id) ? (
-                        <div className="relative mb-4 overflow-hidden rounded-2xl group-hover:scale-105 transition-transform duration-500">
-                          <div className="absolute inset-0 bg-gradient-to-br from-rose-500 to-pink-500 opacity-0 group-hover:opacity-20 transition-opacity duration-500 z-10"></div>
-                          <img
-                            src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
-                            alt={course.title}
-                            className="w-full h-36 rounded-2xl object-cover ring-2 ring-white/50"
-                          />
-                        </div>
+                        <img
+                          src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
+                          alt={course.title}
+                          className="w-full h-32 rounded-lg object-cover mb-3"
+                        />
                       ) : (
-                        <div className="relative w-full h-36 rounded-2xl bg-gradient-to-br from-rose-400 via-pink-400 to-fuchsia-500 flex items-center justify-center mb-4 shadow-lg group-hover:scale-105 transition-transform duration-500">
-                          <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-full h-32 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-3">
+                          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
                         </div>
                       )}
-                      <div className="relative">
-                        <h3 className="font-bold text-slate-900 truncate text-lg group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-rose-600 group-hover:to-pink-600 group-hover:bg-clip-text transition-all duration-300">{course.title}</h3>
-                        <p className="text-sm text-slate-600 line-clamp-2 mt-2 leading-relaxed">{course.introduction}</p>
-                        <div className="space-y-2 mt-4">
-                          {course.teacher_name && (
-                            <div className="flex items-center gap-2 backdrop-blur-sm bg-rose-50/80 px-3 py-1.5 rounded-lg">
-                              <svg className="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                              <span className="text-xs font-medium text-rose-700">{course.teacher_name}</span>
-                            </div>
-                          )}
-                          {course.credits && (
-                            <div className="flex items-center gap-1.5 backdrop-blur-sm bg-pink-50/80 px-2.5 py-1 rounded-lg">
-                              <svg className="w-3.5 h-3.5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                              </svg>
-                              <span className="text-xs font-medium text-pink-700">{course.credits} 学分</span>
-                            </div>
-                          )}
-                        </div>
+                      <h3 className="font-semibold text-slate-900 truncate group-hover:text-emerald-600 transition-colors mb-1">{course.title}</h3>
+                      <p className="text-sm text-slate-600 line-clamp-2 mb-3">{course.introduction}</p>
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        {course.teacher_name && <span>{course.teacher_name}</span>}
+                        {course.credits && <span>· {course.credits} 学分</span>}
                       </div>
-            </div>
+                    </div>
                   ))}
-            </div>
+                </div>
+              </section>
+            )}
+
+            {/* 新上架课程 */}
+            {dashboard && dashboard.new_courses.length > 0 && (
+              <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">{t.student.home.newCourses.title}</h2>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {dashboard.new_courses.map((course) => (
+                    <div
+                      key={course.id}
+                      onClick={() => router.push(`/student/courses/${course.id}`)}
+                      className="group relative bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-rose-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                    >
+                      <div className="absolute top-2 right-2 bg-rose-500 text-white px-2 py-0.5 rounded text-xs font-semibold">
+                        NEW
+                      </div>
+                      {(course.cover_image || course.cover_id) ? (
+                        <img
+                          src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
+                          alt={course.title}
+                          className="w-full h-32 rounded-lg object-cover mb-3"
+                        />
+                      ) : (
+                        <div className="w-full h-32 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mb-3">
+                          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                        </div>
+                      )}
+                      <h3 className="font-semibold text-slate-900 truncate group-hover:text-rose-600 transition-colors mb-1">{course.title}</h3>
+                      <p className="text-sm text-slate-600 line-clamp-2 mb-3">{course.introduction}</p>
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        {course.teacher_name && <span>{course.teacher_name}</span>}
+                        {course.credits && <span>· {course.credits} 学分</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
           </div>
@@ -626,39 +453,35 @@ export default function StudentHomePage() {
             {/* 学习偏好测评按钮 */}
             <button
               onClick={() => setShowProfileModal(true)}
-              className="group relative w-full backdrop-blur-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-pink-500 rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-500 overflow-hidden"
+              className="group w-full bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <div className="relative flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white text-2xl animate-pulse">
-                    🎯
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                   </div>
                   <div className="text-left">
-                    <h3 className="text-lg font-black text-white">学习偏好测评</h3>
-                    <p className="text-sm text-white/80">了解您的学习习惯</p>
+                    <h3 className="text-base font-semibold text-white">学习偏好测评</h3>
+                    <p className="text-xs text-white/90">了解您的学习习惯</p>
                   </div>
                 </div>
-                <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                 </svg>
               </div>
             </button>
 
             {/* 学习曲线 */}
-            <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-7 shadow-xl shadow-emerald-100/50 hover:shadow-2xl hover:shadow-emerald-200/50 transition-all duration-500">
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-500/20 via-transparent to-teal-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-              
-              <div className="relative flex items-center gap-3 mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl blur-sm opacity-50"></div>
-                  <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
+            <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
                 </div>
-                <h3 className="text-lg font-bold bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent">{t.student.home.learningCurve.title}</h3>
+                <h3 className="text-base font-semibold text-slate-900">{t.student.home.learningCurve.title}</h3>
               </div>
               
               {learningCurve.length > 0 ? (
@@ -702,73 +525,64 @@ export default function StudentHomePage() {
             </section>
 
             {/* 老师互动 */}
-            <section className="group relative backdrop-blur-xl bg-white/80 rounded-3xl border border-white/50 p-7 shadow-xl shadow-amber-100/50 hover:shadow-2xl hover:shadow-amber-200/50 transition-all duration-500">
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-500/20 via-transparent to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-              
-              <div className="relative flex items-center gap-3 mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl blur-sm opacity-50"></div>
-                  <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-          </div>
+            <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
                 </div>
-                <h3 className="text-lg font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">{t.student.home.teacherInteraction.title}</h3>
-        </div>
+                <h3 className="text-base font-semibold text-slate-900">{t.student.home.teacherInteraction.title}</h3>
+              </div>
 
-            {interactions.length > 0 ? (
-              <div className="relative space-y-3">
-                {interactions.map((interaction, index) => (
+              {interactions.length > 0 ? (
+                <div className="space-y-3">
+                  {interactions.map((interaction) => (
                     <div
                       key={interaction.id}
-                      className={`group relative backdrop-blur-md rounded-2xl p-4 border transition-all duration-300 hover:scale-[1.02] ${
+                      className={`rounded-lg p-3 border transition-colors duration-200 ${
                         interaction.is_read 
-                          ? 'bg-white/60 border-white/50 hover:border-amber-200' 
-                          : 'bg-gradient-to-br from-amber-50/90 to-orange-50/90 border-amber-200 shadow-md'
+                          ? 'bg-slate-50 border-slate-200' 
+                          : 'bg-amber-50 border-amber-200'
                       }`}
-                      style={{ animationDelay: `${index * 100}ms` }}
                     >
                       {!interaction.is_read && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-br from-red-500 to-pink-500 rounded-full animate-pulse shadow-lg"></div>
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></div>
                       )}
                       <div className="flex items-start gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full blur-sm opacity-50"></div>
-                          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-                            <span className="text-white text-sm font-bold">
-                              {interaction.teacher_name.charAt(0)}
-                            </span>
-                          </div>
-                      </div>
+                        <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-semibold">
+                            {interaction.teacher_name.charAt(0)}
+                          </span>
+                        </div>
                         <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-sm font-bold text-slate-900">{interaction.teacher_name}</span>
-                        <span className="text-xs text-slate-400">·</span>
-                            <span className="text-xs font-medium text-amber-700 backdrop-blur-sm bg-amber-50/50 px-2 py-0.5 rounded-lg">{interaction.course_name}</span>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-slate-900">{interaction.teacher_name}</span>
+                            <span className="text-xs text-slate-400">·</span>
+                            <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{interaction.course_name}</span>
                           </div>
-                          <p className="text-sm text-slate-700 leading-relaxed">{interaction.message}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <p className="text-sm text-slate-700 leading-relaxed mb-2">{interaction.message}</p>
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <p className="text-xs text-slate-500 font-medium">
+                            <span>
                               {new Date(interaction.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                      </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
+                  ))}
+                </div>
+              ) : (
                 <div className="text-center py-8">
-                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   <p className="text-sm text-slate-600">{t.student.home.teacherInteraction.noInteractions}</p>
-              </div>
-            )}
+                </div>
+              )}
             </section>
           </div>
         </div>

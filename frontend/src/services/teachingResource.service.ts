@@ -179,7 +179,7 @@ class TeachingResourceService {
    * 获取文档的预览信息（异步调用，返回预览URL和备用下载URL）
    * 返回格式：{ preview_url, download_url, preview_type, resource_type, file_name }
    */
-  async getOfficePreviewUrl(resourceId: number): Promise<{
+  async getOfficePreviewUrl(resourceId: number, teacherId?: number): Promise<{
     preview_url: string;
     download_url?: string;
     preview_type: string;
@@ -191,7 +191,14 @@ class TeachingResourceService {
     refresh_token_expired_time?: string;
   }> {
     try {
+      // 构建请求参数，如果提供了teacherId则添加
+      const params: any = {};
+      if (teacherId !== undefined) {
+        params.teacher_id = teacherId;
+      }
+      
       const response = await apiClient.get(`/teacher/resources/${resourceId}/preview`, {
+        params,
         timeout: 60000, // 增加超时时间到60秒
       });
       // 如果返回的是JSON格式（包含preview_url字段）

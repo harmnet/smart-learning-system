@@ -107,11 +107,23 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   // 初始化WebOffice
   const initWebOffice = async () => {
-    if (!window.aliyun || !mountRef.current || !previewInfo || !previewInfo.access_token) {
+    if (!window.aliyun || !mountRef.current || !previewInfo) {
+      console.warn('WebOffice初始化条件不满足:', {
+        hasAliyun: !!window.aliyun,
+        hasMountRef: !!mountRef.current,
+        hasPreviewInfo: !!previewInfo
+      });
       return;
     }
 
     try {
+      console.log('开始初始化WebOffice，预览信息:', {
+        preview_url: previewInfo.preview_url,
+        preview_type: previewInfo.preview_type,
+        has_access_token: !!previewInfo.access_token,
+        resource_type: previewInfo.resource_type
+      });
+      
       // 销毁之前的实例和清理observer
       if (instanceRef.current) {
         try {
@@ -129,13 +141,19 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       }
 
       // 创建新实例
+      console.log('创建WebOffice实例，URL:', previewInfo.preview_url);
       const instance = window.aliyun.config({
         mount: mountRef.current,
         url: previewInfo.preview_url,
       });
 
-      // 设置token
-      instance.setToken({ token: previewInfo.access_token });
+      // 设置token（如果有）
+      if (previewInfo.access_token) {
+        console.log('设置access_token');
+        instance.setToken({ token: previewInfo.access_token });
+      } else {
+        console.warn('没有access_token，可能会导致预览失败');
+      }
 
       // 保存实例引用
       instanceRef.current = instance;
@@ -297,7 +315,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
       isOpen &&
       previewInfo?.preview_type === 'weboffice' &&
       sdkLoaded &&
-      previewInfo.access_token &&
+      previewInfo.preview_url &&
       mountRef.current
     ) {
       // 延迟一下确保DOM已渲染
@@ -387,6 +405,30 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     // WebOffice预览
     if (preview_type === 'weboffice') {
+      // 检查是否有必要的预览信息
+      if (!preview_url) {
+        return (
+          <div className="w-full h-[70vh] flex items-center justify-center">
+            <div className="text-center p-6">
+              <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-900 font-semibold mb-2">预览信息不完整</p>
+              <p className="text-gray-600 mb-6">缺少WebOffice预览URL</p>
+              {download_url && (
+                <a
+                  href={download_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  下载文件
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      }
+      
       return (
         <div className="w-full h-[70vh] bg-slate-100 rounded-lg overflow-hidden relative">
           {/* WebOffice挂载点 - 必须始终可见，否则SDK无法正确初始化 */}
@@ -404,6 +446,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               <div className="text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
                 <p className="text-slate-600">正在加载WebOffice预览...</p>
+                <p className="text-slate-500 text-sm mt-2">首次加载可能需要一些时间...</p>
               </div>
             </div>
           )}
@@ -461,6 +504,52 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           {error && (
             <div className="absolute top-4 left-4 right-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm z-20">
               {error}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Direct预览 - 直接在iframe中打开URL（用于OSS WebOffice预览等）
+    if (preview_type === 'direct') {
+      return (
+        <div className="w-full h-[70vh] bg-slate-100 rounded-lg overflow-hidden relative">
+          <iframe
+            src={preview_url}
+            className="w-full h-full border-0"
+            title={resourceName || '文档预览'}
+            onLoad={() => setLoading(false)}
+            onError={(e) => {
+              const errorMsg = '预览加载失败';
+              setError(errorMsg);
+              setLoading(false);
+              if (onError) onError(errorMsg);
+            }}
+          />
+          {loading && (
+            <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-20">
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+                <p className="text-slate-600">正在加载预览...</p>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-30">
+              <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+              <p className="text-gray-900 font-semibold mb-2">预览失败</p>
+              <p className="text-gray-600 mb-6 text-center max-w-md">{error}</p>
+              {download_url && (
+                <a
+                  href={download_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  下载文件
+                </a>
+              )}
             </div>
           )}
         </div>

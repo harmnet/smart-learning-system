@@ -8,6 +8,7 @@ import { teachingResourceService } from '@/services/teachingResource.service';
 import PersonalizedContentModal from '@/components/student/PersonalizedContentModal';
 import AIQuizModal from '@/components/student/AIQuizModal';
 import StudentHomeworkModal from '@/components/student/StudentHomeworkModal';
+import CourseQAFloatingButton from '@/components/student/CourseQAFloatingButton';
 import { HomeworkItem } from '@/types/homework';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import apiClient from '@/lib/api-client';
@@ -197,8 +198,10 @@ export default function StudentCoursePage() {
       // 设置资源名称
       setPreviewResourceName(resource.resource_name || resource.name);
       
-      // 获取预览信息
-      const previewInfo = await teachingResourceService.getOfficePreviewUrl(resource.id);
+      // 获取预览信息（传递teacher_id）
+      const previewInfo = await teachingResourceService.getOfficePreviewUrl(resource.id, resource.teacher_id);
+      
+      console.log('获取到的预览信息:', previewInfo);
       
       // 转换为PreviewInfo格式（包含access_token等字段）
       const fullPreviewInfo: PreviewInfo = {
@@ -208,13 +211,15 @@ export default function StudentCoursePage() {
         resource_type: previewInfo.resource_type,
         file_name: previewInfo.file_name,
         // 如果后端返回了token信息，也包含进来
-        ...(previewInfo as any).access_token && {
-          access_token: (previewInfo as any).access_token,
-          refresh_token: (previewInfo as any).refresh_token,
-          access_token_expired_time: (previewInfo as any).access_token_expired_time,
-          refresh_token_expired_time: (previewInfo as any).refresh_token_expired_time,
-        }
+        ...(previewInfo.access_token && {
+          access_token: previewInfo.access_token,
+          refresh_token: previewInfo.refresh_token,
+          access_token_expired_time: previewInfo.access_token_expired_time,
+          refresh_token_expired_time: previewInfo.refresh_token_expired_time,
+        })
       };
+      
+      console.log('完整预览信息:', fullPreviewInfo);
       
       setPreviewInfo(fullPreviewInfo);
       setShowPreviewModal(true);
@@ -262,13 +267,10 @@ export default function StudentCoursePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-fuchsia-50 to-pink-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
-            <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-violet-600 border-r-fuchsia-600"></div>
-          </div>
-          <p className="mt-6 text-sm font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">加载精彩内容中...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600 font-medium">加载中...</p>
         </div>
       </div>
     );
@@ -276,12 +278,12 @@ export default function StudentCoursePage() {
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-lg border border-blue-100">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">课程未找到</h2>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">课程未找到</h2>
           <button
             onClick={() => router.back()}
-            className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-md"
+            className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
           >
             返回
           </button>
@@ -291,43 +293,26 @@ export default function StudentCoursePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-fuchsia-50 to-pink-50 relative">
-      {/* Animated Background Orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-300/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-fuchsia-300/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-      </div>
-
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="relative backdrop-blur-xl bg-white/70 border-b border-white/50 sticky top-0 z-50 shadow-lg shadow-violet-100/50">
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => router.back()} 
-                className="group relative p-2 text-slate-600 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-all duration-300 hover:scale-110"
+                className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200 cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity"></div>
-                <svg className="relative w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                 </svg>
               </button>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl blur-md opacity-75 group-hover:opacity-100 transition-opacity"></div>
-                <div className="relative w-11 h-11 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden">
-                  {/* 2D扁平化书本图标 */}
-                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-                    <rect x="5" y="4" width="14" height="16" rx="1" fill="white" opacity="0.9"/>
-                    <rect x="7" y="4" width="10" height="16" rx="1" fill="white"/>
-                    <line x1="12" y1="4" x2="12" y2="20" stroke="#8B5CF6" strokeWidth="1.5"/>
-                    <rect x="9" y="8" width="2" height="1" rx="0.5" fill="#C084FC"/>
-                    <rect x="9" y="11" width="2" height="1" rx="0.5" fill="#C084FC"/>
-                    <rect x="13" y="8" width="2" height="1" rx="0.5" fill="#C084FC"/>
-                    <rect x="13" y="11" width="2" height="1" rx="0.5" fill="#C084FC"/>
-                  </svg>
-                </div>
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent">Smart Learning</span>
+              <span className="text-lg font-bold text-slate-900">Smart Learning</span>
             </div>
           </div>
         </div>
@@ -336,34 +321,20 @@ export default function StudentCoursePage() {
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Course Info Card */}
-        <div className="group relative backdrop-blur-xl bg-gradient-to-br from-white/90 to-white/70 rounded-3xl border border-white/50 p-8 mb-8 shadow-2xl shadow-violet-100/50 hover:shadow-3xl hover:shadow-violet-200/50 transition-all duration-500 overflow-hidden">
-          {/* Animated Gradient Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-fuchsia-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          
-          <div className="relative flex flex-col md:flex-row gap-8">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-6">
             {/* Course Cover */}
-            <div className="relative flex-shrink-0 w-full md:w-80 h-48 rounded-2xl overflow-hidden shadow-2xl group-hover:scale-[1.02] transition-transform duration-500">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 blur-xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"></div>
+            <div className="flex-shrink-0 w-full md:w-64 h-40 rounded-lg overflow-hidden">
               {course.cover_image ? (
                 <img
                   src={course.cover_image}
                   alt={course.name || course.title}
-                  className="relative w-full h-full object-cover ring-2 ring-white/50 group-hover:ring-violet-300 transition-all duration-500"
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="relative w-full h-full bg-gradient-to-br from-violet-400 via-fuchsia-400 to-pink-500 flex items-center justify-center">
-                  {/* 2D扁平化书本图标 */}
-                  <svg className="w-24 h-24" viewBox="0 0 80 80" fill="none">
-                    <rect x="15" y="12" width="50" height="56" rx="3" fill="white" opacity="0.95"/>
-                    <rect x="20" y="12" width="40" height="56" rx="3" fill="white"/>
-                    <line x1="40" y1="12" x2="40" y2="68" stroke="#A855F7" strokeWidth="2"/>
-                    <rect x="25" y="22" width="10" height="3" rx="1.5" fill="#C084FC"/>
-                    <rect x="25" y="30" width="10" height="3" rx="1.5" fill="#C084FC"/>
-                    <rect x="25" y="38" width="10" height="3" rx="1.5" fill="#C084FC"/>
-                    <rect x="45" y="22" width="10" height="3" rx="1.5" fill="#E879F9"/>
-                    <rect x="45" y="30" width="10" height="3" rx="1.5" fill="#E879F9"/>
-                    <rect x="45" y="38" width="10" height="3" rx="1.5" fill="#E879F9"/>
-                    <circle cx="40" cy="55" r="5" fill="#F0ABFC"/>
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
               )}
@@ -371,118 +342,75 @@ export default function StudentCoursePage() {
             
             {/* Course Details */}
             <div className="flex-1 min-w-0">
-              <h1 className="text-4xl font-black bg-gradient-to-r from-violet-700 via-fuchsia-600 to-pink-600 bg-clip-text text-transparent mb-4 leading-tight">
+              <h1 className="text-2xl font-bold text-slate-900 mb-4">
                 {course.name || course.title}
               </h1>
               
-              <div className="flex flex-wrap items-center gap-3 mb-6">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 {course.course_type && (
-                  <div className="relative group/badge">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur opacity-0 group-hover/badge:opacity-50 transition-opacity"></div>
-                    <span className={`relative flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold shadow-md ${
-                      course.course_type === 'required'
-                        ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
-                        : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                    }`}>
-                      {/* 2D扁平化星星图标 */}
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
-                        <path d="M8 1L9.5 6H14.5L10.5 9L12 14L8 11L4 14L5.5 9L1.5 6H6.5L8 1Z" fill="white" stroke="white" strokeWidth="0.5" strokeLinejoin="round"/>
-                      </svg>
-                      {course.course_type === 'required' ? '必修课' : '选修课'}
-                    </span>
-                  </div>
+                  <span className={`px-3 py-1 rounded-md text-xs font-medium ${
+                    course.course_type === 'required'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {course.course_type === 'required' ? '必修课' : '选修课'}
+                  </span>
                 )}
                 {course.hours && (
-                  <div className="flex items-center gap-1.5 backdrop-blur-sm bg-violet-50/80 px-3 py-1.5 rounded-xl shadow-sm">
-                    {/* 2D扁平化时钟图标 */}
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="7" fill="#8B5CF6" opacity="0.2"/>
-                      <circle cx="8" cy="8" r="6" fill="#8B5CF6"/>
-                      <path d="M8 4V8L10.5 10.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-md">
+                    <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-xs font-semibold text-violet-700">{course.hours} 学时</span>
+                    <span className="text-xs font-medium text-slate-700">{course.hours} 学时</span>
                   </div>
                 )}
                 {course.credits && (
-                  <div className="flex items-center gap-1.5 backdrop-blur-sm bg-fuchsia-50/80 px-3 py-1.5 rounded-xl shadow-sm">
-                    {/* 2D扁平化奖章图标 */}
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="6" r="4" fill="#D946EF"/>
-                      <path d="M5 9L4 14L8 12L12 14L11 9" fill="#D946EF" opacity="0.8"/>
-                      <circle cx="8" cy="6" r="2" fill="white"/>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-md">
+                    <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
-                    <span className="text-xs font-semibold text-fuchsia-700">{course.credits} 学分</span>
+                    <span className="text-xs font-medium text-slate-700">{course.credits} 学分</span>
                   </div>
                 )}
                 {course.main_teacher_name && (
-                  <div className="flex items-center gap-1.5 backdrop-blur-sm bg-blue-50/80 px-3 py-1.5 rounded-xl shadow-sm">
-                    {/* 2D扁平化教师图标 */}
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="4" r="3" fill="#3B82F6"/>
-                      <path d="M3 14C3 11 5 9 8 9C11 9 13 11 13 14" fill="#3B82F6" opacity="0.8"/>
-                      <rect x="7" y="12" width="2" height="2" rx="0.5" fill="white"/>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-md">
+                    <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    <span className="text-xs font-semibold text-blue-700">{course.main_teacher_name}</span>
+                    <span className="text-xs font-medium text-slate-700">{course.main_teacher_name}</span>
                   </div>
                 )}
                 {course.major_name && (
-                  <div className="flex items-center gap-1.5 backdrop-blur-sm bg-amber-50/80 px-3 py-1.5 rounded-xl shadow-sm">
-                    {/* 2D扁平化建筑图标 */}
-                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                      <rect x="3" y="5" width="10" height="9" rx="0.5" fill="#F59E0B"/>
-                      <rect x="3" y="3" width="10" height="2" fill="#F59E0B" opacity="0.6"/>
-                      <rect x="5" y="7" width="2" height="2" rx="0.5" fill="white"/>
-                      <rect x="9" y="7" width="2" height="2" rx="0.5" fill="white"/>
-                      <rect x="5" y="10" width="2" height="2" rx="0.5" fill="white"/>
-                      <rect x="9" y="10" width="2" height="2" rx="0.5" fill="white"/>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-md">
+                    <svg className="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <span className="text-xs font-semibold text-amber-700">{course.major_name}</span>
+                    <span className="text-xs font-medium text-slate-700">{course.major_name}</span>
                   </div>
                 )}
               </div>
               
               {course.introduction && (
-                <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-violet-50/50 to-fuchsia-50/50 border border-violet-100/50">
-                  <h3 className="flex items-center gap-2 text-base font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent mb-2">
-                    {/* 2D扁平化书本图标 */}
-                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                      <rect x="4" y="3" width="12" height="14" rx="1" fill="url(#book-gradient)"/>
-                      <line x1="10" y1="3" x2="10" y2="17" stroke="white" strokeWidth="1"/>
-                      <rect x="6" y="6" width="2" height="1" rx="0.5" fill="white" opacity="0.8"/>
-                      <rect x="6" y="9" width="2" height="1" rx="0.5" fill="white" opacity="0.8"/>
-                      <rect x="12" y="6" width="2" height="1" rx="0.5" fill="white" opacity="0.8"/>
-                      <rect x="12" y="9" width="2" height="1" rx="0.5" fill="white" opacity="0.8"/>
-                      <defs>
-                        <linearGradient id="book-gradient" x1="4" y1="3" x2="16" y2="17">
-                          <stop offset="0%" stopColor="#8B5CF6"/>
-                          <stop offset="100%" stopColor="#D946EF"/>
-                        </linearGradient>
-                      </defs>
+                <div className="mb-3 p-4 rounded-lg bg-slate-50 border border-slate-200">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 mb-2">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                     课程简介
                   </h3>
-                  <p className="text-slate-700 leading-relaxed text-sm">{course.introduction}</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{course.introduction}</p>
                 </div>
               )}
               
               {course.objectives && (
-                <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50/50 to-cyan-50/50 border border-blue-100/50">
-                  <h3 className="flex items-center gap-2 text-base font-bold bg-gradient-to-r from-blue-700 to-cyan-600 bg-clip-text text-transparent mb-2">
-                    {/* 2D扁平化目标图标 */}
-                    <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                      <circle cx="10" cy="10" r="8" fill="url(#target-gradient)" opacity="0.3"/>
-                      <circle cx="10" cy="10" r="5" fill="url(#target-gradient)" opacity="0.6"/>
-                      <circle cx="10" cy="10" r="2" fill="url(#target-gradient)"/>
-                      <defs>
-                        <linearGradient id="target-gradient" x1="2" y1="2" x2="18" y2="18">
-                          <stop offset="0%" stopColor="#3B82F6"/>
-                          <stop offset="100%" stopColor="#06B6D4"/>
-                        </linearGradient>
-                      </defs>
+                <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 mb-2">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     授课目标
                   </h3>
-                  <p className="text-slate-700 leading-relaxed text-sm">{course.objectives}</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{course.objectives}</p>
                 </div>
               )}
             </div>
@@ -490,97 +418,65 @@ export default function StudentCoursePage() {
         </div>
 
         {/* Tabs */}
-        <div className="relative backdrop-blur-xl bg-gradient-to-br from-white/90 to-white/70 rounded-3xl border border-white/50 overflow-hidden shadow-2xl shadow-violet-100/50">
-          <div className="relative border-b border-violet-100/50 p-2 bg-gradient-to-r from-violet-50/30 to-fuchsia-50/30">
-            <div className="flex gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="border-b border-slate-200">
+            <div className="flex gap-1 p-2">
               <button
                 onClick={() => setActiveTab('outline')}
-                className={`group relative flex-1 px-6 py-4 text-sm font-bold rounded-2xl transition-all duration-300 ${
+                className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 cursor-pointer ${
                   activeTab === 'outline'
-                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/50'
-                    : 'text-slate-600 hover:bg-white/50 hover:text-violet-600'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
                 }`}
               >
-                {activeTab === 'outline' && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-md opacity-50"></div>
-                )}
-                <span className="relative flex items-center justify-center gap-2">
-                  {/* 2D扁平化文档图标 */}
-                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                    <rect x="5" y="2" width="10" height="16" rx="1" fill={activeTab === 'outline' ? 'white' : '#8B5CF6'}/>
-                    <line x1="7" y1="6" x2="13" y2="6" stroke={activeTab === 'outline' ? '#8B5CF6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
-                    <line x1="7" y1="9" x2="13" y2="9" stroke={activeTab === 'outline' ? '#8B5CF6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
-                    <line x1="7" y1="12" x2="11" y2="12" stroke={activeTab === 'outline' ? '#8B5CF6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   课程大纲
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab('behaviors')}
-                className={`group relative flex-1 px-6 py-4 text-sm font-bold rounded-2xl transition-all duration-300 ${
+                className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 cursor-pointer ${
                   activeTab === 'behaviors'
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/50'
-                    : 'text-slate-600 hover:bg-white/50 hover:text-blue-600'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
                 }`}
               >
-                {activeTab === 'behaviors' && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur-md opacity-50"></div>
-                )}
-                <span className="relative flex items-center justify-center gap-2">
-                  {/* 2D扁平化笔记图标 */}
-                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                    <rect x="4" y="3" width="12" height="14" rx="1" fill={activeTab === 'behaviors' ? 'white' : '#3B82F6'}/>
-                    <circle cx="6.5" cy="6" r="0.8" fill={activeTab === 'behaviors' ? '#3B82F6' : 'white'}/>
-                    <line x1="8" y1="6" x2="14" y2="6" stroke={activeTab === 'behaviors' ? '#3B82F6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
-                    <circle cx="6.5" cy="9" r="0.8" fill={activeTab === 'behaviors' ? '#3B82F6' : 'white'}/>
-                    <line x1="8" y1="9" x2="14" y2="9" stroke={activeTab === 'behaviors' ? '#3B82F6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
-                    <circle cx="6.5" cy="12" r="0.8" fill={activeTab === 'behaviors' ? '#3B82F6' : 'white'}/>
-                    <line x1="8" y1="12" x2="14" y2="12" stroke={activeTab === 'behaviors' ? '#3B82F6' : 'white'} strokeWidth="1" strokeLinecap="round"/>
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   学习记录
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab('duration')}
-                className={`group relative flex-1 px-6 py-4 text-sm font-bold rounded-2xl transition-all duration-300 ${
+                className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 cursor-pointer ${
                   activeTab === 'duration'
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/50'
-                    : 'text-slate-600 hover:bg-white/50 hover:text-green-600'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
                 }`}
               >
-                {activeTab === 'duration' && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl blur-md opacity-50"></div>
-                )}
-                <span className="relative flex items-center justify-center gap-2">
-                  {/* 2D扁平化柱状图图标 */}
-                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                    <rect x="3" y="12" width="3" height="5" rx="0.5" fill={activeTab === 'duration' ? 'white' : '#10B981'}/>
-                    <rect x="7" y="8" width="3" height="9" rx="0.5" fill={activeTab === 'duration' ? 'white' : '#10B981'}/>
-                    <rect x="11" y="5" width="3" height="12" rx="0.5" fill={activeTab === 'duration' ? 'white' : '#10B981'}/>
-                    <rect x="15" y="10" width="3" height="7" rx="0.5" fill={activeTab === 'duration' ? 'white' : '#10B981'}/>
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                   学习时长
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab('scores')}
-                className={`group relative flex-1 px-6 py-4 text-sm font-bold rounded-2xl transition-all duration-300 ${
+                className={`flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 cursor-pointer ${
                   activeTab === 'scores'
-                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-500/50'
-                    : 'text-slate-600 hover:bg-white/50 hover:text-amber-600'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-blue-600'
                 }`}
               >
-                {activeTab === 'scores' && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl blur-md opacity-50"></div>
-                )}
-                <span className="relative flex items-center justify-center gap-2">
-                  {/* 2D扁平化奖杯图标 */}
-                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
-                    <path d="M6 4H14V8C14 10.2 12.2 12 10 12C7.8 12 6 10.2 6 8V4Z" fill={activeTab === 'scores' ? 'white' : '#F59E0B'}/>
-                    <rect x="3" y="4" width="2" height="3" rx="0.5" fill={activeTab === 'scores' ? 'white' : '#F59E0B'} opacity="0.7"/>
-                    <rect x="15" y="4" width="2" height="3" rx="0.5" fill={activeTab === 'scores' ? 'white' : '#F59E0B'} opacity="0.7"/>
-                    <rect x="8" y="12" width="4" height="3" rx="0.5" fill={activeTab === 'scores' ? 'white' : '#F59E0B'}/>
-                    <rect x="6" y="15" width="8" height="2" rx="1" fill={activeTab === 'scores' ? 'white' : '#F59E0B'}/>
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                   </svg>
                   测评成绩
                 </span>
@@ -591,36 +487,35 @@ export default function StudentCoursePage() {
           <div className="p-6">
             {/* Course Outline Tab */}
             {activeTab === 'outline' && (
-              <div>
+              <div className="p-6">
                 {chapters.length === 0 ? (
                   <div className="text-center py-10 text-slate-500">
                     该课程暂无大纲内容
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {chapters.map((chapter, chapterIndex) => (
-                      <div key={chapter.id} className="group/chapter relative backdrop-blur-md bg-gradient-to-br from-white/80 to-white/60 border border-violet-100/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300">
-                        <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 to-fuchsia-500/5 opacity-0 group-hover/chapter:opacity-100 transition-opacity duration-300"></div>
+                      <div key={chapter.id} className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
                         <button
                           onClick={() => toggleChapter(chapter.id)}
-                          className="relative flex items-center justify-between w-full p-6 transition-all duration-300"
+                          className="flex items-center justify-between w-full p-4 transition-colors duration-200 cursor-pointer hover:bg-slate-100"
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
                               {chapterIndex + 1}
                             </div>
-                            <h3 className="text-lg font-bold bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent">
+                            <h3 className="text-base font-semibold text-slate-900">
                               {chapter.title}
                             </h3>
                           </div>
                           <div className="flex items-center gap-3">
                             {chapter.sections && chapter.sections.length > 0 && (
-                              <span className="px-3 py-1 rounded-lg bg-violet-100 text-violet-700 text-xs font-semibold">
+                              <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 text-xs font-medium">
                                 {chapter.sections.length} 个小节
                               </span>
                             )}
                             <svg
-                              className={`w-6 h-6 text-violet-600 transform transition-transform duration-300 ${
+                              className={`w-5 h-5 text-slate-600 transform transition-transform duration-200 ${
                                 expandedChapters.has(chapter.id) ? 'rotate-90' : ''
                               }`}
                               fill="none"
@@ -632,31 +527,31 @@ export default function StudentCoursePage() {
                           </div>
                         </button>
                         {expandedChapters.has(chapter.id) && (
-                          <div className="relative p-5 bg-gradient-to-br from-white/50 to-violet-50/30 border-t border-violet-100/50">
+                          <div className="p-4 bg-white border-t border-slate-200">
                             {chapter.sections && chapter.sections.length > 0 ? (
-                              <div className="space-y-3">
+                              <div className="space-y-2 ml-4">
                                 {chapter.sections.map((section, sectionIndex) => (
-                                  <div key={section.id} className="group/section ml-6 backdrop-blur-sm bg-white/70 border border-blue-100/50 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
+                                  <div key={section.id} className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
                                     <button
                                       onClick={() => toggleSection(section.id)}
-                                      className="flex items-center justify-between w-full p-4 transition-all duration-300"
+                                      className="flex items-center justify-between w-full p-3 transition-colors duration-200 cursor-pointer hover:bg-slate-100"
                                     >
-                                      <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-md">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-white text-xs font-medium">
                                           {chapterIndex + 1}.{sectionIndex + 1}
                                         </div>
-                                        <h4 className="text-sm font-semibold text-slate-800">
+                                        <h4 className="text-sm font-medium text-slate-800">
                                           {section.title}
                                         </h4>
                                       </div>
                                       <div className="flex items-center gap-2">
                                         {section.resources && section.resources.length > 0 && (
-                                          <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 text-xs font-semibold">
+                                          <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-medium">
                                             {section.resources.length} 个资源
                                           </span>
                                         )}
                                         <svg
-                                          className={`w-5 h-5 text-blue-600 transform transition-transform duration-300 ${
+                                          className={`w-4 h-4 text-slate-600 transform transition-transform duration-200 ${
                                             expandedSections.has(section.id) ? 'rotate-90' : ''
                                           }`}
                                           fill="none"
@@ -668,22 +563,17 @@ export default function StudentCoursePage() {
                                       </div>
                                     </button>
                                     {expandedSections.has(section.id) && (
-                                      <div className="p-4 ml-6 bg-gradient-to-br from-blue-50/30 to-cyan-50/30 border-t border-blue-100/50 space-y-2">
+                                      <div className="p-3 ml-4 bg-white border-t border-slate-200 space-y-2">
                                         {section.resources && section.resources.length > 0 ? (
                                           section.resources.map((resource) => (
                                             <div
                                               key={resource.id}
-                                              className="relative flex items-center justify-between gap-3 w-full p-3 rounded-xl bg-white/70 border border-blue-100/50 shadow-sm hover:shadow-md transition-all duration-300"
+                                              className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200"
                                             >
                                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center shadow-md">
-                                                  {/* 2D扁平化文档图标 */}
-                                                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none">
-                                                    <rect x="7" y="4" width="10" height="16" rx="1" fill="white"/>
-                                                    <path d="M17 4H15V2C15 1.4 14.6 1 14 1H10C9.4 1 9 1.4 9 2V4H7C6.4 4 6 4.4 6 5V19C6 19.6 6.4 20 7 20H17C17.6 20 18 19.6 18 19V5C18 4.4 17.6 4 17 4Z" fill="white" opacity="0.9"/>
-                                                    <rect x="9" y="8" width="6" height="1" rx="0.5" fill="#3B82F6"/>
-                                                    <rect x="9" y="11" width="6" height="1" rx="0.5" fill="#3B82F6"/>
-                                                    <rect x="9" y="14" width="4" height="1" rx="0.5" fill="#3B82F6"/>
+                                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                                                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                   </svg>
                                                 </div>
                                                 <span className="text-sm font-medium text-slate-800 truncate">
@@ -693,7 +583,7 @@ export default function StudentCoursePage() {
                                               <div className="flex items-center gap-2 flex-shrink-0">
                                                 <button
                                                   onClick={() => handleResourceClick(resource)}
-                                                  className="px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition-colors"
+                                                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
                                                 >
                                                   查看
                                                 </button>
@@ -702,16 +592,16 @@ export default function StudentCoursePage() {
                                                     setSelectedResource(resource);
                                                     setShowPersonalizedModal(true);
                                                   }}
-                                                  className="px-3 py-1.5 bg-violet-500 text-white text-xs font-medium rounded-lg hover:bg-violet-600 transition-colors"
+                                                  className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-200 cursor-pointer"
                                                 >
-                                                  个性化学习
+                                                  个性化
                                                 </button>
                                                 <button
                                                   onClick={() => {
                                                     setSelectedResource(resource);
                                                     setShowQuizModal(true);
                                                   }}
-                                                  className="px-3 py-1.5 bg-fuchsia-500 text-white text-xs font-medium rounded-lg hover:bg-fuchsia-600 transition-colors"
+                                                  className="px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-colors duration-200 cursor-pointer"
                                                 >
                                                   AI测评
                                                 </button>
@@ -724,8 +614,8 @@ export default function StudentCoursePage() {
 
                                         {/* 课后作业列表 */}
                                         {section.homework && section.homework.length > 0 && (
-                                          <div className="mt-4 pt-4 border-t border-violet-100/50">
-                                            <h5 className="flex items-center gap-2 text-sm font-semibold text-violet-700 mb-3">
+                                          <div className="mt-4 pt-4 border-t border-slate-200">
+                                            <h5 className="flex items-center gap-2 text-sm font-semibold text-slate-900 mb-3">
                                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
                                               </svg>
@@ -735,11 +625,11 @@ export default function StudentCoursePage() {
                                               {section.homework.map((hw) => (
                                                 <div
                                                   key={hw.id}
-                                                  className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gradient-to-r from-violet-50/70 to-fuchsia-50/70 border border-violet-100/50 hover:shadow-md transition-all duration-300"
+                                                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200 hover:shadow-sm transition-all duration-200"
                                                 >
                                                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-md">
-                                                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                                      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                                       </svg>
                                                     </div>
@@ -747,15 +637,15 @@ export default function StudentCoursePage() {
                                                       <p className="text-sm font-medium text-slate-800 truncate">{hw.title}</p>
                                                       <div className="flex items-center gap-2 mt-1">
                                                         {hw.deadline && (
-                                                          <span className={`text-xs ${new Date(hw.deadline) < new Date() ? 'text-red-500' : 'text-gray-500'}`}>
+                                                          <span className={`text-xs ${new Date(hw.deadline) < new Date() ? 'text-red-600' : 'text-slate-500'}`}>
                                                             截止: {new Date(hw.deadline).toLocaleDateString('zh-CN')}
                                                           </span>
                                                         )}
-                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                                                           hw.submission_status === 'graded' ? 'bg-green-100 text-green-700' :
                                                           hw.submission_status === 'submitted' ? 'bg-blue-100 text-blue-700' :
                                                           hw.submission_status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
-                                                          'bg-gray-100 text-gray-600'
+                                                          'bg-slate-100 text-slate-600'
                                                         }`}>
                                                           {hw.submission_status === 'graded' ? `已批改 ${hw.score !== null ? hw.score + '分' : ''}` :
                                                            hw.submission_status === 'submitted' ? '已提交' :
@@ -769,10 +659,10 @@ export default function StudentCoursePage() {
                                                       setSelectedHomeworkId(hw.id);
                                                       setShowHomeworkModal(true);
                                                     }}
-                                                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-colors duration-200 cursor-pointer ${
                                                       hw.submission_status === 'not_started' || hw.submission_status === 'draft'
-                                                        ? 'bg-violet-500 text-white hover:bg-violet-600'
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                                     }`}
                                                   >
                                                     {hw.submission_status === 'not_started' ? '开始作业' :
@@ -802,8 +692,8 @@ export default function StudentCoursePage() {
 
             {/* Learning Behaviors Tab */}
             {activeTab === 'behaviors' && (
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-6">学习行为记录</h2>
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-6">学习行为记录</h2>
                 {learningBehaviors.length === 0 ? (
                   <div className="text-center py-10 text-slate-500">
                     暂无学习记录
@@ -844,8 +734,8 @@ export default function StudentCoursePage() {
 
             {/* Study Duration Tab */}
             {activeTab === 'duration' && (
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-6">学习时长走势（最近30天）</h2>
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-6">学习时长走势（最近30天）</h2>
                 {studyDurations.length === 0 ? (
                   <div className="text-center py-10 text-slate-500">
                     暂无学习时长数据
@@ -877,8 +767,8 @@ export default function StudentCoursePage() {
 
             {/* Exam Scores Tab */}
             {activeTab === 'scores' && (
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-6">测评成绩走势</h2>
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-slate-900 mb-6">测评成绩走势</h2>
                 {examScores.length === 0 ? (
                   <div className="text-center py-10 text-slate-500">
                     暂无测评成绩数据
@@ -992,6 +882,9 @@ export default function StudentCoursePage() {
           loadData();
         }}
       />
+
+      {/* 课程问答浮动按钮 */}
+      <CourseQAFloatingButton courseId={courseId} />
     </div>
   );
 }

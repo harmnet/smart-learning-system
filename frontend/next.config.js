@@ -36,6 +36,14 @@ const nextConfig = {
         source: '/uploads/:path*',
         destination: 'https://ezijingai.oss-cn-beijing.aliyuncs.com/uploads/:path*',
       },
+      {
+        source: '/ai-creation/:path*',
+        destination: 'https://ezijingai.oss-cn-beijing.aliyuncs.com/ai-creation/:path*',
+      },
+      {
+        source: '/teaching_resources/:path*',
+        destination: 'https://ezijingai.oss-cn-beijing.aliyuncs.com/teaching_resources/:path*',
+      },
     ]
   },
 }

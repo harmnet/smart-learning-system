@@ -18,6 +18,7 @@ from app.models.base import User
 from app.utils.oss_client import oss_client
 from app.utils.libreoffice_converter import libreoffice_converter
 from app.core.config import settings
+from app.services.imm_service import imm_service
 
 router = APIRouter()
 
@@ -829,7 +830,97 @@ async def preview_resource(
                     "file_name": resource.original_filename.replace(Path(resource.original_filename).suffix, '.pdf')
                 }
         
-        # 如果没有PDF，使用后端代理下载URL（前端JavaScript转换作为备用方案）
+        # 如果没有PDF，尝试使用WebOffice预览（如果文件在OSS上）
+        if resource.file_path and oss_client.enabled:
+            # 判断文件是否在OSS上（可能是完整URL或相对路径）
+            oss_key = None
+            
+            # 情况1：完整的HTTP/HTTPS URL
+            if resource.file_path.startswith('http://') or resource.file_path.startswith('https://'):
+                # 从URL中提取object_key
+                if '.aliyuncs.com/' in resource.file_path:
+                    parts = resource.file_path.split('.aliyuncs.com/')
+                    if len(parts) > 1:
+                        oss_key = parts[1].split('?')[0]
+                elif settings.OSS_USE_CNAME and settings.OSS_ENDPOINT:
+                    if resource.file_path.startswith(settings.OSS_ENDPOINT):
+                        oss_key = resource.file_path.replace(settings.OSS_ENDPOINT + '/', '').split('?')[0]
+            # 情况2：相对路径（直接就是object_key）
+            elif not resource.file_path.startswith('/'):
+                # 相对路径，直接作为object_key使用
+                oss_key = resource.file_path
+                logging.info(f"检测到相对路径，作为OSS key使用: {oss_key}")
+            
+            if oss_key:
+                # 优先使用IMM服务生成WebOffice预览URL和token（支持iframe嵌入）
+                if imm_service:
+                    try:
+                        # 获取当前用户信息（从request中获取，如果没有则使用默认值）
+                        # 注意：这里需要从认证信息中获取用户ID和名称
+                        # 暂时使用teacher_id作为user_id
+                        user_id = str(teacher_id)
+                        user_name = "学生"  # 可以从request中获取实际用户名
+                        
+                        # 构建水印配置（可选）
+                        watermark_config = None
+                        # 如果需要水印，可以这样配置：
+                        # watermark_config = {"Type": 1, "Value": "内部资料"}
+                        
+                        # 使用IMM服务生成WebOffice预览凭证
+                        imm_result = imm_service.generate_weboffice_token(
+                            object_name=oss_key,
+                            user_id=user_id,
+                            user_name=user_name,
+                            permission="readonly",  # 学生端只读
+                            watermark=watermark_config,
+                            expire_seconds=3600  # 1小时有效期
+                        )
+                        
+                        if imm_result.get("success") and imm_result.get("weboffice_url") and imm_result.get("access_token"):
+                            logging.info(f"成功使用IMM服务生成WebOffice预览URL")
+                            return {
+                                "preview_url": imm_result.get("weboffice_url"),
+                                "download_url": f"{str(request.base_url).rstrip('/')}/api/v1/teacher/resources/{resource_id}/download",
+                                "preview_type": "weboffice",  # 使用weboffice类型，前端使用WebOffice SDK
+                                "resource_type": resource_type,
+                                "file_name": resource.original_filename,
+                                "access_token": imm_result.get("access_token"),
+                                "refresh_token": imm_result.get("refresh_token"),
+                                "access_token_expired_time": imm_result.get("access_token_expired_time"),
+                                "refresh_token_expired_time": imm_result.get("refresh_token_expired_time")
+                            }
+                        else:
+                            error_msg = imm_result.get("error", "未知错误")
+                            logging.warning(f"IMM服务生成WebOffice凭证失败: {error_msg}，尝试使用OSS签名URL")
+                    except Exception as e:
+                        logging.error(f"使用IMM服务生成WebOffice凭证失败: {e}，尝试使用OSS签名URL")
+                
+                # 如果IMM服务不可用或失败，回退到OSS签名URL方式
+                try:
+                    # 使用oss_client生成带WebOffice预览参数的签名URL
+                    preview_url = oss_client.generate_weboffice_preview_url(
+                        object_key=oss_key,
+                        expires=3600,  # 1小时有效期
+                        allow_export=True,
+                        allow_print=True,
+                        watermark_text=None  # 可选：添加水印
+                    )
+                    
+                    if preview_url:
+                        logging.info(f"成功生成WebOffice预览URL: {preview_url}")
+                        return {
+                            "preview_url": preview_url,
+                            "download_url": f"{str(request.base_url).rstrip('/')}/api/v1/teacher/resources/{resource_id}/download",
+                            "preview_type": "direct",  # 使用direct类型，前端直接在iframe中打开
+                            "resource_type": resource_type,
+                            "file_name": resource.original_filename
+                        }
+                    else:
+                        logging.error("生成WebOffice预览URL失败：返回空URL")
+                except Exception as e:
+                    logging.error(f"生成WebOffice签名URL失败: {e}")
+        
+        # 如果WebOffice失败，使用后端代理下载URL（前端JavaScript转换作为备用方案）
         base_url = str(request.base_url).rstrip('/')
         proxy_download_url = f"{base_url}/api/v1/teacher/resources/{resource_id}/download"
         return {
