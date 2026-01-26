@@ -45,6 +45,12 @@ ENV/
 .env.production.bak
 *.env.production*
 
+# SSH Keys and Certificates
+*.pem
+*.key
+*.crt
+*.p12
+
 # Node.js
 node_modules/
 npm-debug.log*
