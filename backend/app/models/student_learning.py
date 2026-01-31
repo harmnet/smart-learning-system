@@ -187,44 +187,6 @@ class StudentHomeworkSubmission(Base):
     homework = relationship("CourseSectionHomework", foreign_keys=[homework_id])
     course = relationship("Course", foreign_keys=[course_id])
     chapter = relationship("CourseChapter", foreign_keys=[chapter_id])
-    grade_histories = relationship("StudentHomeworkGradeHistory", foreign_keys="[StudentHomeworkGradeHistory.submission_id]", cascade="all, delete-orphan", lazy="selectin")
-
-
-class StudentHomeworkGradeHistory(Base):
-    """
-    学生作业评分历史记录表
-    """
-    __tablename__ = "student_homework_grade_history"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey("student_homework_submission.id", ondelete="CASCADE"), nullable=False, comment="作业提交记录ID")
-    teacher_id = Column(Integer, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="评分教师ID")
-    score = Column(Float, nullable=True, comment="评分")
-    teacher_comment = Column(Text, nullable=True, comment="评分评语")
-    graded_at = Column(DateTime, default=datetime.utcnow, comment="评分时间")
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    
-    # Relationships
-    submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id])
-    teacher = relationship("User", foreign_keys=[teacher_id])
-
-
-class StudentHomeworkAIGradingLog(Base):
-    __tablename__ = "student_homework_ai_grading_log"
-
-    id = Column(Integer, primary_key=True, index=True)
-    submission_id = Column(Integer, ForeignKey("student_homework_submission.id", ondelete="CASCADE"), nullable=False, comment="作业提交记录ID")
-    teacher_id = Column(Integer, ForeignKey("sys_user.id", ondelete="CASCADE"), nullable=False, comment="触发教师ID")
-    llm_config_id = Column(Integer, ForeignKey("llm_config.id"), nullable=True, comment="使用的大模型配置ID")
-    prompt = Column(Text, nullable=False, comment="AI批改提示词")
-    result = Column(Text, nullable=False, comment="AI批改原始结果")
-    score = Column(Float, nullable=True, comment="AI评分")
-    comment = Column(Text, nullable=True, comment="AI评语")
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-
-    submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id])
-    teacher = relationship("User", foreign_keys=[teacher_id])
-    llm_config = relationship("LLMConfig", foreign_keys=[llm_config_id])
 
 
 class StudentHomeworkAttachment(Base):
@@ -245,3 +207,68 @@ class StudentHomeworkAttachment(Base):
     
     # Relationships
     submission = relationship("StudentHomeworkSubmission", foreign_keys=[submission_id], backref="attachments")
+
+
+class StudentImportedExamScore(Base):
+    """
+    学生导入的考试成绩（期中/期末）
+    """
+    __tablename__ = "student_imported_exam_score"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("sys_user.id"), nullable=False, comment="学生ID")
+    course_id = Column(Integer, ForeignKey("course.id"), nullable=False, comment="课程ID")
+    exam_type = Column(String(20), nullable=False, comment="考试类型：midterm、final")
+    score = Column(Float, nullable=False, comment="得分")
+    total_score = Column(Float, nullable=False, default=100, comment="总分")
+    imported_at = Column(DateTime, default=datetime.utcnow, comment="导入时间")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course", foreign_keys=[course_id])
+
+
+class CourseGrade(Base):
+    """
+    课程总评成绩（含分项构成）
+    """
+    __tablename__ = "course_grade"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("sys_user.id"), nullable=False, comment="学生ID")
+    course_id = Column(Integer, ForeignKey("course.id"), nullable=False, comment="课程ID")
+    final_score = Column(Numeric(5, 2), nullable=True, comment="总评分数（0-100）")
+    breakdown = Column(JSONB, nullable=True, comment="各维度分数与权重构成")
+    is_published = Column(Boolean, default=False, comment="是否已发布")
+    published_at = Column(DateTime, nullable=True, comment="发布时间")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    student = relationship("User", foreign_keys=[student_id])
+    course = relationship("Course", foreign_keys=[course_id])
+
+
+class CourseGradePublishHistory(Base):
+    """
+    成绩发布历史记录（支持班级/学生维度）
+    """
+    __tablename__ = "course_grade_publish_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("course.id"), nullable=False, comment="课程ID")
+    class_id = Column(Integer, ForeignKey("sys_class.id"), nullable=True, comment="班级ID（可选）")
+    student_id = Column(Integer, ForeignKey("sys_user.id"), nullable=True, comment="学生ID（可选）")
+    action = Column(String(20), nullable=False, comment="动作：publish、unpublish")
+    scope = Column(String(20), nullable=False, comment="维度：class、student")
+    operator_id = Column(Integer, ForeignKey("sys_user.id"), nullable=False, comment="操作教师用户ID")
+    remark = Column(Text, nullable=True, comment="备注")
+    created_at = Column(DateTime, default=datetime.utcnow, comment="操作时间")
+    
+    # Relationships
+    course = relationship("Course", foreign_keys=[course_id])
+    class_ = relationship("Class", foreign_keys=[class_id])
+    student = relationship("User", foreign_keys=[student_id])
+    operator = relationship("User", foreign_keys=[operator_id])

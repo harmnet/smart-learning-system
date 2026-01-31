@@ -19,14 +19,12 @@ async def login_access_token(
     db: AsyncSession = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    print(f"🔐 登录尝试 - 用户名/手机号/邮箱: {form_data.username}")
+    print(f"🔐 登录尝试 - 用户名/手机号: {form_data.username}")
     
-    # Find user by username, phone, or email
+    # Find user by username or phone
     result = await db.execute(
         select(User).where(
-            (User.username == form_data.username)
-            | (User.phone == form_data.username)
-            | (User.email == form_data.username)
+            (User.username == form_data.username) | (User.phone == form_data.username)
         )
     )
     user = result.scalars().first()
@@ -35,7 +33,7 @@ async def login_access_token(
         print(f"❌ 用户不存在: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username/phone/email or password",
+            detail="Incorrect username/phone or password",
         )
     
     print(f"✅ 找到用户: {user.username}, 手机: {user.phone}, ID: {user.id}, 激活状态: {user.is_active}")
@@ -57,7 +55,7 @@ async def login_access_token(
         print(f"❌ 密码错误")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username/phone/email or password",
+            detail="Incorrect username/phone or password",
         )
     
     print(f"✅ 登录成功! 用户角色: {user.role}")
@@ -113,3 +111,4 @@ async def register_user(
         await db.commit()
         
     return user
+

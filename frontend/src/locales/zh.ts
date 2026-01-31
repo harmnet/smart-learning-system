@@ -36,7 +36,6 @@ export const zh = {
     previous: '上一页',
     next: '下一页',
     total: '共',
-    create: '创建',
     update: '更新',
     upload: '上传',
     download: '下载',
@@ -58,6 +57,7 @@ export const zh = {
     majors: '专业管理',
     classes: '班级管理',
     dictionary: '数据字典',
+    enrollments: '报名管理',
     finance: '财务管理',
     courseCovers: '课程封面',
     resources: '资源库',
@@ -337,6 +337,53 @@ export const zh = {
       deleteError: {
         hasClasses: '无法删除专业：该专业下已有关联的班级，请先删除或重新分配这些班级后再试。',
         hasTeachers: '无法删除专业：该专业下已有关联的有效教师，请先删除或重新分配这些教师后再试。'
+      }
+    },
+    enrollments: {
+      title: '报名管理',
+      subtitle: '查看学生报名记录并进行审批',
+      filters: {
+        phone: '手机号',
+        status: '审批状态',
+        dateFrom: '开始日期',
+        dateTo: '结束日期'
+      },
+      columns: {
+        id: '编号',
+        phone: '手机号',
+        childName: '学生姓名',
+        programme: '意向项目',
+        createdAt: '提交时间',
+        status: '状态',
+        rejectReason: '拒绝原因'
+      },
+      status: {
+        pending: '待审批',
+        approved: '已通过',
+        rejected: '已拒绝'
+      },
+      actions: {
+        view: '查看',
+        approve: '通过',
+        reject: '拒绝'
+      },
+      confirmations: {
+        approve: '确认通过该报名申请？',
+        rejectReason: '请输入拒绝原因（可选）'
+      },
+      errors: {
+        adminIdMissing: '未获取到管理员信息，请重新登录',
+        loadFailed: '加载详情失败',
+        actionFailed: '操作失败，请稍后重试'
+      },
+      detail: {
+        title: '报名详情',
+        empty: '暂无报名详情'
+      },
+      fields: {
+        approvedAt: '通过时间',
+        rejectedAt: '拒绝时间',
+        rejectReason: '拒绝原因'
       }
     },
     finance: {

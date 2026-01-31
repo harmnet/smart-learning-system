@@ -1,511 +1,232 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import DocumentViewer from '@/components/DocumentViewer';
+import { useState } from 'react';
 import TeacherLayout from '@/components/teacher/TeacherLayout';
-import { teacherService } from '@/services/teacher.service';
-import {
-  TeacherCourseOption,
-  TeacherHomeworkGradeHistoryItem,
-  TeacherHomeworkAIGradeResponse,
-  TeacherHomeworkSubmissionDetail,
-  TeacherHomeworkSubmissionItem,
-} from '@/types/homework';
+import apiClient from '@/lib/api-client';
 
-const inputStyle = 'w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm';
-const selectStyle = 'w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none text-sm bg-white';
-
-const formatDateTime = (value: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-};
-
-const getPreviewType = (fileName: string, fileType?: string | null) => {
-  const normalized = (fileType || fileName).toLowerCase();
-  if (normalized.includes('pdf') || normalized.endsWith('.pdf')) return 'pdf';
-  if (normalized.includes('ppt') || normalized.endsWith('.ppt') || normalized.endsWith('.pptx')) return 'pptx';
-  if (normalized.includes('doc') || normalized.endsWith('.doc') || normalized.endsWith('.docx')) return 'docx';
-  return null;
-};
+interface Submission {
+  id: number;
+  studentName: string;
+  studentId: string;
+  assignment: string;
+  course: string;
+  submitDate: string;
+  status: 'pending' | 'graded';
+  score?: number;
+  maxScore: number;
+}
 
 export default function TeacherGradingPage() {
-  const [courses, setCourses] = useState<TeacherCourseOption[]>([]);
-  const [submissions, setSubmissions] = useState<TeacherHomeworkSubmissionItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchForm, setSearchForm] = useState({
-    course_id: '',
-    student_no: '',
-    student_name: '',
-    homework_title: '',
-    status: 'all' as 'all' | 'submitted' | 'graded',
-  });
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
+  const [submissions] = useState<Submission[]>([
+    { id: 1, studentName: '张三', studentId: '2024001', assignment: 'Web项目实战', course: 'Web开发基础', submitDate: '2024-11-26', status: 'pending', maxScore: 100 },
+    { id: 2, studentName: '李四', studentId: '2024002', assignment: '数据结构作业', course: '数据结构与算法', submitDate: '2024-11-25', status: 'pending', maxScore: 100 },
+    { id: 3, studentName: '王五', studentId: '2023015', assignment: '第一章测验', course: '计算机科学导论', submitDate: '2024-11-24', status: 'graded', score: 85, maxScore: 100 },
+  ]);
+
+  const [filter, setFilter] = useState<'all' | Submission['status']>('all');
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
-  const [selectedSubmission, setSelectedSubmission] = useState<TeacherHomeworkSubmissionDetail | null>(null);
-  const [history, setHistory] = useState<TeacherHomeworkGradeHistoryItem[]>([]);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [score, setScore] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [aiGrading, setAiGrading] = useState(false);
   const [aiTargetId, setAiTargetId] = useState<number | null>(null);
-  const [aiResult, setAiResult] = useState<TeacherHomeworkAIGradeResponse | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ url: string; type: 'pdf' | 'pptx' | 'docx'; title: string } | null>(null);
-
-  useEffect(() => {
-    loadCourses();
-    loadData();
-  }, []);
-
-  const loadCourses = async () => {
-    try {
-      const data = await teacherService.getHomeworkCourses();
-      setCourses(data);
-    } catch (err: any) {
-      setCourses([]);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiResult, setAiResult] = useState<{ score?: number; comment?: string; summary?: string; llm_config_name?: string } | null>(null);
+  const stats = [
+    {
+      label: '待批改',
+      value: submissions.filter(s => s.status === 'pending').length,
+      icon: (
+        <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
+    {
+      label: '已批改',
+      value: submissions.filter(s => s.status === 'graded').length,
+      icon: (
+        <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+        </svg>
+      )
+    },
+    {
+      label: '平均分',
+      value: submissions.filter(s => s.score).length > 0
+        ? Math.round(submissions.filter(s => s.score).reduce((sum, s) => sum + (s.score || 0), 0) / submissions.filter(s => s.score).length)
+        : 0,
+      icon: (
+        <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 12h2m-1-8v4m0 12v-4m8-4h-4M8 12H4m15.364 6.364l-2.828-2.828M8.464 8.464L5.636 5.636m12.728 0l-2.828 2.828M8.464 15.536l-2.828 2.828" />
+        </svg>
+      )
+    },
+    {
+      label: '总提交',
+      value: submissions.length,
+      icon: (
+        <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+        </svg>
+      )
     }
-  };
+  ];
 
-  const buildParams = (params?: typeof searchForm) => {
-    const form = params || searchForm;
-    return {
-      course_id: form.course_id ? Number(form.course_id) : undefined,
-      student_no: form.student_no || undefined,
-      student_name: form.student_name || undefined,
-      homework_title: form.homework_title || undefined,
-      status: form.status === 'all' ? undefined : form.status,
-    };
-  };
+  const filteredSubmissions = filter === 'all' 
+    ? submissions 
+    : submissions.filter(s => s.status === filter);
 
-  const loadData = async (params?: typeof searchForm, page?: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const currentPage = page || pagination.current;
-      const skip = (currentPage - 1) * pagination.pageSize;
-      const response = await teacherService.getHomeworkSubmissions({
-        ...buildParams(params),
-        skip,
-        limit: pagination.pageSize,
-      });
-      setSubmissions(response.items);
-      setPagination({
-        ...pagination,
-        current: currentPage,
-        total: response.total || 0,
-      });
-    } catch (err: any) {
-      setError(err.message || '加载作业失败');
-      setSubmissions([]);
-      setPagination({
-        ...pagination,
-        current: 1,
-        total: 0,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (event: React.FormEvent) => {
-    event.preventDefault();
-    setPagination({ ...pagination, current: 1 });
-    loadData(searchForm, 1);
-  };
-
-  const handleReset = () => {
-    const emptyForm = {
-      course_id: '',
-      student_no: '',
-      student_name: '',
-      homework_title: '',
-      status: 'all' as const,
-    };
-    setSearchForm(emptyForm);
-    setPagination({ ...pagination, current: 1 });
-    loadData(emptyForm, 1);
-  };
-
-  const handlePageChange = (page: number) => {
-    setPagination({ ...pagination, current: page });
-    loadData(searchForm, page);
-  };
-
-  const handleStatusChange = (status: 'all' | 'submitted' | 'graded') => {
-    const nextForm = { ...searchForm, status };
-    setSearchForm(nextForm);
-    setPagination({ ...pagination, current: 1 });
-    loadData(nextForm, 1);
-  };
-
-  const openSubmissionModal = async (submissionId: number) => {
+  const handleGrade = (submission: Submission) => {
+    setSelectedSubmission(submission);
     setGradingModalOpen(true);
-    setSelectedSubmissionId(submissionId);
-    setSelectedSubmission(null);
-    setHistory([]);
-    setModalError(null);
-    setAiResult(null);
-    setAiError(null);
-    setAiGrading(false);
-    setAiTargetId(null);
-    setDetailLoading(true);
-    setHistoryLoading(true);
     setScore('');
     setFeedback('');
-    try {
-      const [detail, historyResponse] = await Promise.all([
-        teacherService.getHomeworkSubmissionDetail(submissionId),
-        teacherService.getHomeworkSubmissionHistory(submissionId, { skip: 0, limit: 10 }),
-      ]);
-      setSelectedSubmission(detail);
-      setHistory(historyResponse.items);
-      setScore(detail.score !== null && detail.score !== undefined ? String(detail.score) : '');
-      setFeedback(detail.teacher_comment || '');
-    } catch (err: any) {
-      setModalError(err.message || '加载作业详情失败');
-    } finally {
-      setDetailLoading(false);
-      setHistoryLoading(false);
-    }
   };
 
   const handleAiGrade = async (submissionId: number) => {
-    await openSubmissionModal(submissionId);
-    setAiTargetId(submissionId);
-    setAiGrading(true);
-    setAiError(null);
-    setAiResult(null);
     try {
-      const result = await teacherService.aiGradeHomeworkSubmission(submissionId);
-      setAiResult(result);
-      if (result.score !== null && result.score !== undefined) {
-        setScore(String(result.score));
-      }
-      const nextFeedback = result.feedback || result.raw_result || '';
-      if (nextFeedback) {
-        setFeedback(nextFeedback);
-      }
+      setAiGrading(true);
+      setAiTargetId(submissionId);
+      const response = await apiClient.post(`/teacher/homeworks/submissions/${submissionId}/ai-grade`);
+      setAiResult(response.data || null);
+      setAiModalOpen(true);
     } catch (err: any) {
-      setAiError(err.message || 'AI批改失败');
+      alert('AI批改失败: ' + (err?.response?.data?.detail || err?.message || '未知错误'));
     } finally {
       setAiGrading(false);
       setAiTargetId(null);
     }
   };
 
-  const handleGradeSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedSubmissionId) return;
-    if (!score) return;
-    try {
-      setSubmitting(true);
-      await teacherService.gradeHomeworkSubmission(selectedSubmissionId, {
-        score: Number(score),
-        teacher_comment: feedback || null,
-      });
-      const [detail, historyResponse] = await Promise.all([
-        teacherService.getHomeworkSubmissionDetail(selectedSubmissionId),
-        teacherService.getHomeworkSubmissionHistory(selectedSubmissionId, { skip: 0, limit: 10 }),
-      ]);
-      setSelectedSubmission(detail);
-      setHistory(historyResponse.items);
-      loadData(searchForm, pagination.current);
-    } catch (err: any) {
-      setModalError(err.message || '提交批改失败');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const totalPages = Math.ceil(pagination.total / pagination.pageSize);
-
   return (
     <TeacherLayout>
-      <div className="h-full flex flex-col">
-        <div className="px-8 py-6 border-b border-slate-100 bg-white">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 mb-1">作业批改</h1>
-            <p className="text-sm text-slate-500">查看学生作业提交，进行批改和评分</p>
+      <div className="space-y-8">
+        <section className="rounded-2xl border border-slate-200 bg-white p-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">作业批改</h1>
+            <p className="mt-1 text-sm text-slate-600">查看学生作业提交，进行批改、评分与AI辅助批改</p>
           </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-8">
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 mb-6">
-          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">课程名称</label>
-              <select
-                className={selectStyle}
-                value={searchForm.course_id}
-                onChange={(event) => setSearchForm({ ...searchForm, course_id: event.target.value })}
-              >
-                <option value="">全部课程</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">学号</label>
-              <input
-                type="text"
-                className={inputStyle}
-                value={searchForm.student_no}
-                onChange={(event) => setSearchForm({ ...searchForm, student_no: event.target.value })}
-                placeholder="请输入学号"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">学生姓名</label>
-              <input
-                type="text"
-                className={inputStyle}
-                value={searchForm.student_name}
-                onChange={(event) => setSearchForm({ ...searchForm, student_name: event.target.value })}
-                placeholder="请输入学生姓名"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">作业名称</label>
-              <input
-                type="text"
-                className={inputStyle}
-                value={searchForm.homework_title}
-                onChange={(event) => setSearchForm({ ...searchForm, homework_title: event.target.value })}
-                placeholder="请输入作业名称"
-              />
-            </div>
-            <div className="flex items-end gap-3">
-              <button
-                type="submit"
-                className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-              >
-                查询
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="flex-1 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-semibold hover:border-blue-600 hover:text-blue-600 transition-colors"
-              >
-                重置
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            { label: '全部', value: 'all' as const },
-            { label: '待批改', value: 'submitted' as const },
-            { label: '已批改', value: 'graded' as const },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => handleStatusChange(tab.value)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                searchForm.status === tab.value
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-          {error && (
-            <div className="px-6 py-4 bg-rose-50 text-rose-600 text-sm font-semibold">{error}</div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-600">
-                <tr>
-                  <th className="px-6 py-4">课程 / 章节</th>
-                  <th className="px-6 py-4">作业</th>
-                  <th className="px-6 py-4">学生</th>
-                  <th className="px-6 py-4">提交时间</th>
-                  <th className="px-6 py-4">状态</th>
-                  <th className="px-6 py-4">评分</th>
-                  <th className="px-6 py-4 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
-                      <div className="inline-flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></span>
-                        加载中
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {!loading && submissions.map((item) => (
-                  <tr key={item.id} className="text-sm text-slate-700">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{item.course_title}</div>
-                      <div className="text-slate-500">
-                        {item.parent_chapter_title ? `${item.parent_chapter_title} / ` : ''}
-                        {item.chapter_title || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{item.homework_title}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{item.student_name}</div>
-                      <div className="text-slate-500">{item.student_no || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">{formatDateTime(item.submitted_at)}</td>
-                    <td className="px-6 py-4">
-                      {item.status === 'graded' ? (
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">已批改</span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">待批改</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-slate-900">{item.score ?? '-'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          onClick={() => handleAiGrade(item.id)}
-                          disabled={aiGrading}
-                          className="px-4 py-2 text-sm font-semibold text-violet-600 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {aiGrading && aiTargetId === item.id ? (
-                            <span className="inline-flex items-center gap-2">
-                              <span className="w-3 h-3 border-2 border-violet-300 border-t-transparent rounded-full animate-spin"></span>
-                              AI批改中
-                            </span>
-                          ) : (
-                            'AI批改'
-                          )}
-                        </button>
-                        <button
-                          onClick={() => openSubmissionModal(item.id)}
-                          className="px-4 py-2 text-sm font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                          {item.status === 'graded' ? '查看批改' : '开始批改'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!loading && submissions.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                      暂无作业提交记录
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {pagination.total > 0 && (
-            <div className="px-6 py-5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
-              <div className="text-sm text-slate-500">
-                显示 {((pagination.current - 1) * pagination.pageSize) + 1} - {Math.min(pagination.current * pagination.pageSize, pagination.total)} 条，共 {pagination.total} 条
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePageChange(pagination.current - 1)}
-                  disabled={pagination.current === 1}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  上一页
-                </button>
-                <div className="flex items-center gap-1">
-                  {(() => {
-                    const pages = [];
-                    const showPages = 5;
-                    let startPage = Math.max(1, pagination.current - Math.floor(showPages / 2));
-                    let endPage = Math.min(totalPages, startPage + showPages - 1);
-                    if (endPage - startPage < showPages - 1) {
-                      startPage = Math.max(1, endPage - showPages + 1);
-                    }
-                    if (startPage > 1) {
-                      pages.push(
-                        <button
-                          key={1}
-                          onClick={() => handlePageChange(1)}
-                          className="w-10 h-10 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                        >
-                          1
-                        </button>
-                      );
-                      if (startPage > 2) {
-                        pages.push(<span key="ellipsis1" className="px-2 text-slate-400">...</span>);
-                      }
-                    }
-                    for (let i = startPage; i <= endPage; i++) {
-                      pages.push(
-                        <button
-                          key={i}
-                          onClick={() => handlePageChange(i)}
-                          className={`w-10 h-10 text-sm font-semibold rounded-full transition-colors ${
-                            i === pagination.current
-                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                              : 'text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          {i}
-                        </button>
-                      );
-                    }
-                    if (endPage < totalPages) {
-                      if (endPage < totalPages - 1) {
-                        pages.push(<span key="ellipsis2" className="px-2 text-slate-400">...</span>);
-                      }
-                      pages.push(
-                        <button
-                          key={totalPages}
-                          onClick={() => handlePageChange(totalPages)}
-                          className="w-10 h-10 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                        >
-                          {totalPages}
-                        </button>
-                      );
-                    }
-                    return pages;
-                  })()}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          {stats.map((stat, idx) => (
+            <div key={idx} className="bg-white rounded-xl p-5 border border-slate-200 hover:bg-slate-50 transition-colors">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                  {stat.icon}
                 </div>
-                <button
-                  onClick={() => handlePageChange(pagination.current + 1)}
-                  disabled={pagination.current >= totalPages}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  下一页
-                </button>
+                <div className="text-2xl font-semibold text-slate-900">{stat.value}</div>
               </div>
+              <div className="text-sm text-slate-600">{stat.label}</div>
+            </div>
+          ))}
+          </div>
+          <div className="flex gap-2 mb-6">
+            {[
+              { label: '全部', value: 'all' as const },
+              { label: '待批改', value: 'pending' as const },
+              { label: '已批改', value: 'graded' as const },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setFilter(tab.value)}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  filter === tab.value
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-4">
+            {filteredSubmissions.map((submission) => (
+              <div key={submission.id} className="bg-white rounded-xl p-6 border border-slate-200 hover:border-blue-200 transition-colors">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {submission.studentName.charAt(0)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-neutral-900">{submission.assignment}</h3>
+                      {submission.status === 'pending' ? (
+                        <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold border border-blue-100">待批改</span>
+                      ) : (
+                        <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold border border-slate-200">已批改</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-neutral-600">
+                      <span>学生: {submission.studentName} ({submission.studentId})</span>
+                      <span>•</span>
+                      <span>课程: {submission.course}</span>
+                      <span>•</span>
+                      <span>提交时间: {submission.submitDate}</span>
+                    </div>
+                  </div>
+                </div>
+                {submission.status === 'graded' && submission.score !== undefined && (
+                  <div className="text-right ml-4">
+                    <div className="text-3xl font-semibold text-blue-600">{submission.score}</div>
+                    <div className="text-sm text-neutral-500">/ {submission.maxScore}</div>
+                  </div>
+                )}
+              </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => handleGrade(submission)}
+                    className={`flex-1 py-3 rounded-xl text-sm font-semibold transition-all ${
+                      submission.status === 'pending'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    {submission.status === 'pending' ? '开始批改' : '查看批改'}
+                  </button>
+                  <button
+                    onClick={() => handleAiGrade(submission.id)}
+                    disabled={aiGrading}
+                    className="px-6 py-3 border border-blue-200 text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {aiGrading && aiTargetId === submission.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-3 h-3 border-2 border-blue-200 border-t-transparent rounded-full animate-spin"></span>
+                        AI批改中
+                      </span>
+                    ) : (
+                      'AI批改'
+                    )}
+                  </button>
+                  <button className="px-6 py-3 border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold bg-white hover:border-slate-300 transition-all">
+                    查看作业
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {filteredSubmissions.length === 0 && (
+            <div className="text-center py-12 rounded-2xl border border-slate-200 bg-slate-50">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-white flex items-center justify-center border border-slate-200">
+                <svg className="h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                </svg>
+              </div>
+              <div className="text-xl font-semibold text-neutral-900 mb-2">暂无作业</div>
+              <div className="text-neutral-500">当前没有需要批改的作业</div>
             </div>
           )}
-          </div>
-        </div>
+        </section>
       </div>
-
-      {gradingModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-8">
+      {/* Grading Modal */}
+      {gradingModalOpen && selectedSubmission && (
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">批改作业</h2>
+              <h2 className="text-2xl font-bold text-neutral-900">批改作业</h2>
               <button
                 onClick={() => setGradingModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                className="p-2 text-neutral-400 hover:text-neutral-600 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -513,257 +234,151 @@ export default function TeacherGradingPage() {
               </button>
             </div>
 
-            {modalError && (
-              <div className="mb-6 px-4 py-3 bg-rose-50 text-rose-600 text-sm font-semibold rounded-xl">{modalError}</div>
-            )}
-            {aiError && (
-              <div className="mb-6 px-4 py-3 bg-rose-50 text-rose-600 text-sm font-semibold rounded-xl">{aiError}</div>
-            )}
-            {aiGrading && (
-              <div className="mb-6 px-4 py-3 bg-violet-50 text-violet-600 text-sm font-semibold rounded-xl">
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-violet-300 border-t-transparent rounded-full animate-spin"></span>
-                  AI批改中
-                </span>
-              </div>
-            )}
-            {aiResult && !aiGrading && (
-              <div className="mb-6 bg-violet-50 border border-violet-100 rounded-2xl p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-violet-700">AI批改结果</div>
-                  {aiResult.score !== null && aiResult.score !== undefined && (
-                    <div className="text-sm font-semibold text-violet-700">建议评分：{aiResult.score}</div>
-                  )}
-                </div>
-                <div className="mt-3 text-sm text-slate-700 whitespace-pre-wrap">
-                  {aiResult.feedback || aiResult.raw_result || '暂无AI批改内容'}
-                </div>
-              </div>
-            )}
-
-            {detailLoading && (
-              <div className="py-10 text-center text-slate-500">
-                <span className="inline-flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></span>
-                  加载作业详情中
-                </span>
-              </div>
-            )}
-
-            {!detailLoading && selectedSubmission && (
-              <div className="space-y-6">
-                <div className="bg-slate-50 rounded-2xl p-6">
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-slate-600">学生姓名:</span>
-                      <span className="ml-2 font-semibold text-slate-900">{selectedSubmission.student.name || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-600">学号:</span>
-                      <span className="ml-2 font-semibold text-slate-900">{selectedSubmission.student.student_no || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-600">课程名称:</span>
-                      <span className="ml-2 font-semibold text-slate-900">{selectedSubmission.course.title || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-600">章节信息:</span>
-                      <span className="ml-2 font-semibold text-slate-900">
-                        {selectedSubmission.chapter.parent_title ? `${selectedSubmission.chapter.parent_title} / ` : ''}
-                        {selectedSubmission.chapter.title || '-'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-600">作业名称:</span>
-                      <span className="ml-2 font-semibold text-slate-900">{selectedSubmission.homework.title || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-600">提交时间:</span>
-                      <span className="ml-2 font-semibold text-slate-900">{formatDateTime(selectedSubmission.submitted_at)}</span>
-                    </div>
-                  </div>
-                </div>
-
+            {/* Student Info */}
+            <div className="bg-slate-50 rounded-xl p-6 mb-6 border border-slate-200">
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-3">作业内容</h3>
-                  <div className="bg-slate-50 rounded-2xl p-6 text-sm text-slate-700">
-                    {selectedSubmission.content ? (
-                      <div className="whitespace-pre-wrap leading-relaxed">{selectedSubmission.content}</div>
-                    ) : (
-                      <div className="text-slate-500">学生未填写作业内容</div>
-                    )}
-                  </div>
+                  <span className="text-neutral-600">学生姓名:</span>
+                  <span className="ml-2 font-semibold text-neutral-900">{selectedSubmission.studentName}</span>
                 </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="bg-slate-50 rounded-2xl p-6">
-                    <h4 className="text-sm font-semibold text-slate-700 mb-4">学生附件</h4>
-                    {selectedSubmission.attachments.length === 0 && (
-                      <div className="text-sm text-slate-500">暂无附件</div>
-                    )}
-                    <div className="space-y-3">
-                      {selectedSubmission.attachments.map((attachment) => {
-                        const previewType = getPreviewType(attachment.file_name, attachment.file_type);
-                        return (
-                          <div key={attachment.id} className="flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-100 px-4 py-3">
-                            <div>
-                              <div className="text-sm font-semibold text-slate-900">{attachment.file_name}</div>
-                              <div className="text-xs text-slate-500">{attachment.file_size ? `${(attachment.file_size / 1024 / 1024).toFixed(2)} MB` : '未知大小'}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={attachment.file_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-                              >
-                                下载
-                              </a>
-                              {previewType && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreview({ url: attachment.file_url, type: previewType, title: attachment.file_name })}
-                                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
-                                >
-                                  预览
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-6">
-                    <h4 className="text-sm font-semibold text-slate-700 mb-4">作业要求附件</h4>
-                    {selectedSubmission.homework_attachments.length === 0 && (
-                      <div className="text-sm text-slate-500">暂无附件</div>
-                    )}
-                    <div className="space-y-3">
-                      {selectedSubmission.homework_attachments.map((attachment) => {
-                        const previewType = getPreviewType(attachment.file_name, attachment.file_type);
-                        return (
-                          <div key={attachment.id} className="flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-100 px-4 py-3">
-                            <div>
-                              <div className="text-sm font-semibold text-slate-900">{attachment.file_name}</div>
-                              <div className="text-xs text-slate-500">{attachment.file_size ? `${(attachment.file_size / 1024 / 1024).toFixed(2)} MB` : '未知大小'}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={attachment.file_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50"
-                              >
-                                下载
-                              </a>
-                              {previewType && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreview({ url: attachment.file_url, type: previewType, title: attachment.file_name })}
-                                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
-                                >
-                                  预览
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                <div>
+                  <span className="text-neutral-600">学号:</span>
+                  <span className="ml-2 font-semibold text-neutral-900">{selectedSubmission.studentId}</span>
                 </div>
-
-                <div className="bg-slate-50 rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-semibold text-slate-700">评分历史</h4>
-                    <span className="text-xs text-slate-500">{history.length} 条记录</span>
-                  </div>
-                  {historyLoading && (
-                    <div className="text-sm text-slate-500">加载评分历史中</div>
-                  )}
-                  {!historyLoading && history.length === 0 && (
-                    <div className="text-sm text-slate-500">暂无历史评分</div>
-                  )}
-                  {!historyLoading && history.length > 0 && (
-                    <div className="space-y-3">
-                      {history.map((item) => (
-                        <div key={item.id} className="bg-white border border-slate-100 rounded-xl px-4 py-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <div className="font-semibold text-slate-900">评分 {item.score ?? '-'}</div>
-                            <div className="text-slate-500">{formatDateTime(item.graded_at)}</div>
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">评分老师：{item.teacher_name}</div>
-                          {item.teacher_comment && (
-                            <div className="text-sm text-slate-600 mt-2">{item.teacher_comment}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div>
+                  <span className="text-neutral-600">作业名称:</span>
+                  <span className="ml-2 font-semibold text-neutral-900">{selectedSubmission.assignment}</span>
                 </div>
-
-                <form onSubmit={handleGradeSubmit} className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">评分 *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={score}
-                      onChange={(event) => setScore(event.target.value)}
-                      placeholder="请输入分数"
-                      className={inputStyle}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">批改意见 *</label>
-                    <textarea
-                      value={feedback}
-                      onChange={(event) => setFeedback(event.target.value)}
-                      placeholder="请输入批改意见和建议"
-                      className={`${inputStyle} min-h-[140px] resize-none`}
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setGradingModalOpen(false)}
-                      className="flex-1 py-3 border-2 border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-blue-600 hover:text-blue-600 transition-colors"
-                    >
-                      关闭
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting || !score || !feedback}
-                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? '提交中...' : '提交批改'}
-                    </button>
-                  </div>
-                </form>
+                <div>
+                  <span className="text-neutral-600">提交时间:</span>
+                  <span className="ml-2 font-semibold text-neutral-900">{selectedSubmission.submitDate}</span>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Assignment Content */}
+            <div className="mb-6">
+              <h3 className="font-bold text-neutral-900 mb-3">作业内容</h3>
+              <div className="bg-slate-50 rounded-xl p-6 text-sm text-neutral-700 border border-slate-200">
+                <p className="mb-4">这是学生提交的作业内容示例...</p>
+                <div className="flex items-center gap-2 text-blue-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span>project.zip (2.5 MB)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Grading Form */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              alert('批改成功！');
+              setGradingModalOpen(false);
+            }} className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">
+                  评分 (满分 {selectedSubmission.maxScore}) *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={selectedSubmission.maxScore}
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  placeholder={`请输入分数 (0-${selectedSubmission.maxScore})`}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-neutral-700 mb-2">
+                  批改意见 *
+                </label>
+                <textarea
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="请输入批改意见和建议..."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none resize-none"
+                  rows={6}
+                  required
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setGradingModalOpen(false)}
+                  className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-slate-300 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={!score || !feedback}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  提交批改
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-
-      {preview && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-6">
-          <div className="bg-white rounded-2xl w-full max-w-5xl h-[80vh] overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <div className="text-sm font-semibold text-slate-900">{preview.title}</div>
+      {aiModalOpen && aiResult && (
+        <div className="fixed inset-0 bg-slate-900/20 flex items-center justify-center z-50 p-6">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full border border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-900">AI批改结果</h3>
               <button
-                onClick={() => setPreview(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                onClick={() => setAiModalOpen(false)}
+                className="p-2 text-neutral-400 hover:text-neutral-600 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
               </button>
             </div>
-            <DocumentViewer url={preview.url} type={preview.type} title={preview.title} />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm text-slate-600">建议评分</div>
+                  <div className="text-2xl font-semibold text-blue-600 mt-1">{aiResult?.score ?? '-'}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm text-slate-600">模型来源</div>
+                  <div className="text-sm font-semibold text-slate-900 mt-1">{aiResult?.llm_config_name || '—'}</div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-semibold text-slate-900 mb-2">评语</div>
+                <div className="text-sm text-slate-700 whitespace-pre-wrap">{aiResult?.comment || '—'}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-semibold text-slate-900 mb-2">要点总结</div>
+                <div className="text-sm text-slate-700 whitespace-pre-wrap">{aiResult?.summary || '—'}</div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    if (aiResult?.score !== undefined) setScore(String(aiResult.score));
+                    if (aiResult?.comment) setFeedback(aiResult.comment);
+                    setAiModalOpen(false);
+                    setGradingModalOpen(true);
+                  }}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  应用到批改表单
+                </button>
+                <button
+                  onClick={() => setAiModalOpen(false)}
+                  className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-slate-300 transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

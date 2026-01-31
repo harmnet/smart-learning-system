@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, Numeric, Float
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -144,6 +145,7 @@ class Course(Base):
     is_public = Column(Boolean, default=False)  # 是否公开课
     is_deleted = Column(Boolean, default=False)  # 逻辑删除标记
     major_id = Column(Integer, ForeignKey("major.id"), nullable=True)  # 所属专业ID
+    grade_composition = Column(JSONB, nullable=True)  # 课程成绩构成配置（JSON）
     
     # Relationships
     chapters = relationship("CourseChapter", back_populates="course", cascade="all, delete-orphan")
@@ -226,4 +228,3 @@ class EnrollmentOrder(Base):
     status = Column(String, default="pending")  # pending, paid, cancelled
     created_at = Column(DateTime, default=datetime.utcnow)
     paid_at = Column(DateTime, nullable=True)
-

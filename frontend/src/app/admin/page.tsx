@@ -239,20 +239,47 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* 页面标题 */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t.admin.dashboard.title}</h1>
-        <p className="text-sm text-slate-500 mt-1">系统概览与数据统计</p>
-      </div>
+    <div className="space-y-8">
+      <section className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              {new Date().toLocaleDateString()}
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+              {t.admin.dashboard.welcome}，{t.admin.dashboard.title}
+            </h1>
+            <p className="mt-3 text-sm text-slate-600">系统概览与数据统计</p>
+          </div>
+          <div className="w-full lg:w-80">
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+              <div className="text-xs font-semibold text-slate-500">今日重点</div>
+              <div className="mt-4 space-y-4 text-sm text-slate-700">
+                <div className="flex items-center justify-between gap-3">
+                  <span>{t.admin.dashboard.statistics.activeToday}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                    {statistics.active_users_today.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>{t.admin.dashboard.statistics.activeWeek}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                    {statistics.active_users_week.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {/* 统计卡片网格 - 简洁商务风格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statisticsCards.map((card, index) => (
           <div
             key={index}
             onClick={() => card.link !== '#' && router.push(card.link)}
-            className={`bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all duration-200 ${
+            className={`bg-white border border-slate-200/80 rounded-3xl p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] hover:shadow-[0_20px_44px_rgba(15,23,42,0.08)] transition ${
               card.link !== '#' ? 'cursor-pointer' : ''
             }`}
           >
@@ -261,7 +288,7 @@ export default function AdminDashboardPage() {
                 <p className="text-sm font-medium text-slate-600 mb-2">{card.title}</p>
                 <p className="text-3xl font-bold text-slate-900">{card.value.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
                 {card.icon}
               </div>
             </div>
@@ -269,13 +296,14 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* 趋势图表和系统健康状态 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 新增用户趋势图 */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-6">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">
-            {t.admin.dashboard.trends.newUsers} ({t.admin.dashboard.trends.last30Days})
-          </h3>
+        <div className="lg:col-span-2 bg-white border border-slate-200/70 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-900">
+              {t.admin.dashboard.trends.newUsers}
+            </h3>
+            <span className="text-xs text-slate-500">{t.admin.dashboard.trends.last30Days}</span>
+          </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={statistics.new_users_trend}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -310,14 +338,15 @@ export default function AdminDashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* 系统健康状态 */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">
-            {t.admin.dashboard.systemHealth.title}
-          </h3>
+        <div className="bg-white border border-slate-200/70 rounded-3xl p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-900">
+              {t.admin.dashboard.systemHealth.title}
+            </h3>
+            <span className="text-xs text-slate-500">Live</span>
+          </div>
           <div className="space-y-4">
-            {/* 数据库状态 */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+            <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-200/70 bg-slate-50/70">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
                   <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,8 +365,7 @@ export default function AdminDashboardPage() {
               <div className={`w-2 h-2 rounded-full ${getStatusDot(statistics.system_health.database_status)}`} />
             </div>
 
-            {/* API状态 */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+            <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-200/70 bg-slate-50/70">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
                   <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -356,9 +384,8 @@ export default function AdminDashboardPage() {
               <div className={`w-2 h-2 rounded-full ${getStatusDot(statistics.system_health.api_status)}`} />
             </div>
 
-            {/* 存储空间 - 只在有真实数据时显示 */}
             {statistics.system_health.storage_usage !== null && statistics.system_health.storage_usage !== undefined && (
-              <div className="p-3 rounded-lg bg-slate-50">
+              <div className="p-3 rounded-2xl border border-slate-200/70 bg-slate-50/70">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
                     <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,11 +416,13 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 用户活跃度趋势图 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <h3 className="text-base font-semibold text-slate-900 mb-4">
-          {t.admin.dashboard.trends.activity} ({t.admin.dashboard.trends.last30Days})
-        </h3>
+      <div className="bg-white border border-slate-200/70 rounded-3xl p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-slate-900">
+            {t.admin.dashboard.trends.activity}
+          </h3>
+          <span className="text-xs text-slate-500">{t.admin.dashboard.trends.last30Days}</span>
+        </div>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={statistics.user_activity_trend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -425,17 +454,19 @@ export default function AdminDashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* 快捷操作 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <h3 className="text-base font-semibold text-slate-900 mb-4">
-          {t.admin.dashboard.quickActions.title}
-        </h3>
+      <div className="bg-white border border-slate-200/70 rounded-3xl p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-slate-900">
+            {t.admin.dashboard.quickActions.title}
+          </h3>
+          <span className="text-xs text-slate-500">Quick</span>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {quickActions.map((action, index) => (
             <button
               key={index}
               onClick={() => router.push(action.link)}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all duration-200"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-200/80 bg-slate-50 hover:bg-white hover:border-slate-300 shadow-sm transition"
             >
               <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
                 {action.icon}

@@ -2563,7 +2563,7 @@ COPY public.llm_config (id, provider_name, provider_key, api_key, api_secret, en
 3	KIMI (Moonshot)	kimi	sk-your-api-key-here	\N	https://api.moonshot.cn/v1	moonshot-v1-8k	\N	f	2025-12-31 07:16:08.322844	2025-12-31 07:16:08.322844
 4	百度文心一言	wenxin	your-api-key-here	\N	https://aip.baidubce.com/rpc/2.0/ai_custom/v1	ernie-bot-turbo	\N	f	2025-12-31 07:16:08.322844	2025-12-31 07:16:08.322844
 5	火山引擎豆包	volcengine_doubao	sk-your-api-key-here	\N	https://ark.cn-beijing.volces.com/api/v3	doubao-pro-32k	\N	f	2025-12-31 07:16:08.322844	2025-12-31 07:16:08.322844
-6	硅基流动	siliconflow	sk-cnecrxllknqmleogrmwbbmwpxdhbypnurkxhsmhvzrquohrw		https://api.siliconflow.cn/v1/chat/completions	deepseek-ai/DeepSeek-V3.2		t	2025-12-31 07:16:08.322844	2025-12-31 07:35:22.04737
+6	硅基流动	siliconflow	sk-redacted		https://api.siliconflow.cn/v1/chat/completions	deepseek-ai/DeepSeek-V3.2		t	2025-12-31 07:16:08.322844	2025-12-31 07:35:22.04737
 \.
 
 
@@ -4573,4 +4573,3 @@ ALTER TABLE ONLY public.teaching_resource
 --
 
 \unrestrict f40VQpHrTZY2KBp8FznhW12yAcBaD8cVNNs4BNCfnptbT8wI771A3ljoOyvqtTr
-

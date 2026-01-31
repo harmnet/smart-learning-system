@@ -8,6 +8,7 @@
 ALTER TABLE course ADD COLUMN IF NOT EXISTS course_category VARCHAR(50);
 ALTER TABLE course ADD COLUMN IF NOT EXISTS enrollment_type VARCHAR(20);
 ALTER TABLE course ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+ALTER TABLE course ADD COLUMN IF NOT EXISTS grade_composition JSONB;
 
 -- 2. 创建章节学习规则表
 CREATE TABLE IF NOT EXISTS course_chapter_learning_rule (
@@ -54,4 +55,3 @@ CREATE INDEX IF NOT EXISTS idx_chapter_kg_node ON course_chapter_knowledge_graph
 
 -- 7. 为已存在的课程添加默认值
 UPDATE course SET is_deleted = FALSE WHERE is_deleted IS NULL;
-

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { majorService, Major } from '@/services/major.service';
 import Banner from '@/components/Banner';
+import { useEnrollmentModal } from '@/contexts/EnrollmentModalContext';
 
 // Load Google Fonts for professional typography - Inter for modern UI
 if (typeof window !== 'undefined') {
@@ -14,6 +15,7 @@ if (typeof window !== 'undefined') {
 }
 
 export default function Home() {
+  const { openModal } = useEnrollmentModal();
   const [featuredMajors, setFeaturedMajors] = useState<Major[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string>('');
@@ -100,15 +102,16 @@ export default function Home() {
             >
               登录
             </Link>
-            <Link 
-              href="/auth/register" 
-              className="relative group px-7 py-2.5 text-sm font-bold text-white rounded-xl transition-all duration-300" 
+            <button
+              type="button"
+              onClick={() => openModal()}
+              className="relative group px-7 py-2.5 text-sm font-bold text-white rounded-xl transition-all duration-300"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 rounded-xl opacity-100 group-hover:opacity-90 transition-opacity"></div>
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 rounded-xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity"></div>
               <span className="relative">立即报名</span>
-            </Link>
+            </button>
           </div>
         </div>
 

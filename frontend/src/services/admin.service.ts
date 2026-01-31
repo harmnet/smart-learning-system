@@ -136,6 +136,38 @@ export interface FinanceStats {
   total_amount: number;
 }
 
+export type EnrollmentStatus = 'pending' | 'approved' | 'rejected';
+
+export interface EnrollmentListItem {
+  id: number;
+  phone: string;
+  status: EnrollmentStatus;
+  child_name: string;
+  programme_interested: string | null;
+  created_at: string | null;
+}
+
+export interface EnrollmentListResponse {
+  items: EnrollmentListItem[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface EnrollmentDetail {
+  [key: string]: any;
+}
+
+export interface EnrollmentApprovalResponse {
+  id: number;
+  status: EnrollmentStatus;
+  approved_at?: string | null;
+  approved_by?: number | null;
+  rejected_at?: string | null;
+  rejected_by?: number | null;
+  reject_reason?: string | null;
+}
+
 export interface StudentUpdate {
   username?: string;
   full_name?: string;
@@ -254,6 +286,27 @@ export const adminService = {
 
   getFinanceStats: async (): Promise<FinanceStats> => {
     const response = await apiClient.get<FinanceStats>('/admin/finance/stats');
+    return response.data;
+  },
+
+  // 报名管理
+  getEnrollments: async (params?: { skip?: number; limit?: number; phone?: string; status?: string; date_from?: string; date_to?: string }): Promise<EnrollmentListResponse> => {
+    const response = await apiClient.get<EnrollmentListResponse>('/admin/enrollments', { params });
+    return response.data;
+  },
+
+  getEnrollmentDetail: async (id: number): Promise<EnrollmentDetail> => {
+    const response = await apiClient.get<EnrollmentDetail>(`/admin/enrollments/${id}`);
+    return response.data;
+  },
+
+  approveEnrollment: async (id: number, adminId: number): Promise<EnrollmentApprovalResponse> => {
+    const response = await apiClient.post<EnrollmentApprovalResponse>(`/admin/enrollments/${id}/approve`, { admin_id: adminId });
+    return response.data;
+  },
+
+  rejectEnrollment: async (id: number, adminId: number, reason?: string): Promise<EnrollmentApprovalResponse> => {
+    const response = await apiClient.post<EnrollmentApprovalResponse>(`/admin/enrollments/${id}/reject`, { admin_id: adminId, reason });
     return response.data;
   },
 

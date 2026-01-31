@@ -32,8 +32,10 @@ class TeachingResourceService {
   /**
    * 获取资源统计
    */
-  async getStats(): Promise<ResourceStats> {
-    const response = await apiClient.get<ResourceStats>('/teacher/resources/stats');
+  async getStats(teacherId: number): Promise<ResourceStats> {
+    const response = await apiClient.get<ResourceStats>('/teacher/resources/stats', {
+      params: { teacher_id: teacherId },
+    });
     return response.data;
   }
 

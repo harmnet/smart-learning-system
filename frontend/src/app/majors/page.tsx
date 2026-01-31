@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { majorService, Major } from '@/services/major.service';
+import { useEnrollmentModal } from '@/contexts/EnrollmentModalContext';
 
 export default function MajorsPage() {
+  const { openModal } = useEnrollmentModal();
   const [majors, setMajors] = useState<Major[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
@@ -56,9 +58,13 @@ export default function MajorsPage() {
               <Link href="/auth/login" className="px-5 py-2 text-sm font-medium text-neutral-700 hover:text-blue-600 transition-colors">
                 登录
               </Link>
-              <Link href="/auth/register" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30">
+              <button
+                type="button"
+                onClick={openModal}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+              >
                 立即报名
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -214,12 +220,13 @@ export default function MajorsPage() {
           <p className="text-xl text-blue-100 mb-8">
             立即注册，开启你的学习之旅
           </p>
-          <Link
-            href="/auth/register"
+          <button
+            type="button"
+            onClick={openModal}
             className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-all shadow-2xl hover:shadow-3xl hover:-translate-y-1"
           >
             立即报名
-          </Link>
+          </button>
         </div>
       </section>
 

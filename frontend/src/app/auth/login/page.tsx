@@ -59,7 +59,7 @@ export default function LoginPage() {
       if (role === 'admin') {
         router.push('/admin');
       } else if (role === 'teacher') {
-        router.push('/teacher/resources');
+        router.push('/teacher/home');
       } else if (role === 'student') {
         router.push('/student/home');
       } else {

@@ -2099,7 +2099,7 @@ COPY public.llm_config (id, provider_name, provider_key, api_key, api_secret, en
 4	文心一言	wenxin			https://aip.baidubce.com/rpc/2.0/ai_custom/v1	ERNIE-Bot-4	\N	f	2025-12-05 03:39:38.094419	2025-12-05 03:39:38.094419
 5	火山引擎-豆包	volcengine_doubao		\N	https://ark.cn-beijing.volces.com/api/v3	doubao-pro-32k	\N	f	2025-12-05 03:39:38.094419	2025-12-05 03:39:38.09442
 6	硅基流动	siliconflow		\N	https://api.siliconflow.cn/v1	Qwen/Qwen2-7B-Instruct	\N	f	2025-12-05 03:39:38.09442	2025-12-05 03:39:38.09442
-1	阿里云百炼-通义千问	aliyun_qwen	sk-1f4bdb8a73ee47809ee148a977c39737	OKUYiiO9WOw5bJpRTfJa7F76Ayygdk	https://dashscope.aliyuncs.com/api/v1	qwen-max		t	2025-12-05 03:39:38.094415	2025-12-05 05:28:34.820365
+1	阿里云百炼-通义千问	aliyun_qwen	sk-redacted	redacted	https://dashscope.aliyuncs.com/api/v1	qwen-max		t	2025-12-05 03:39:38.094415	2025-12-05 05:28:34.820365
 \.
 
 
@@ -3620,4 +3620,3 @@ ALTER TABLE ONLY public.teaching_resource
 --
 
 \unrestrict ucdNaee0cf14kmqgxACyVddpR8IlXbHQy279ucvsFw3w1A5r7jeM7ItcTKGX30O
-

@@ -16,6 +16,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001"
+]
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -36,22 +43,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": exc.errors(),
             "body": str(exc.body) if exc.body else None
         },
-        headers={
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': '*',
-        }
+        headers=_build_cors_headers(request)
     )
 
 # HTTPException异常处理（确保CORS头）
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    # 合并CORS headers和HTTPException的headers
-    headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': '*',
-    }
+    headers = _build_cors_headers(request)
     if exc.headers:
         headers.update(exc.headers)
     return JSONResponse(
@@ -70,11 +68,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": f"内部服务器错误: {str(exc)}",
             "type": type(exc).__name__
         },
-        headers={
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': '*',
-        }
+        headers=_build_cors_headers(request)
     )
 
 # 静态文件服务 - 用于访问上传的封面图片
@@ -90,12 +84,26 @@ app.mount("/uploads/exam_covers", StaticFiles(directory=str(exam_covers_dir)), n
 # Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有源（开发环境）
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+def _build_cors_headers(request: Request) -> dict:
+    origin = request.headers.get("origin")
+    if origin and origin in allowed_origins:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true"
+        }
+    return {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "*"
+    }
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -106,4 +114,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-

@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Major } from '@/services/major.service';
+import { useEnrollmentModal } from '@/contexts/EnrollmentModalContext';
 
 export default function MajorDetailPage() {
+  const { openModal } = useEnrollmentModal();
   const params = useParams();
   const router = useRouter();
   const [major, setMajor] = useState<Major | null>(null);
@@ -67,9 +69,13 @@ export default function MajorDetailPage() {
               <Link href="/auth/login" className="px-5 py-2 text-sm font-medium text-neutral-700 hover:text-blue-600 transition-colors">
                 登录
               </Link>
-              <Link href="/auth/register" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30">
+              <button
+                type="button"
+                onClick={openModal}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-medium hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30"
+              >
                 立即报名
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -183,12 +189,13 @@ export default function MajorDetailPage() {
                   </div>
                 </div>
 
-                <Link
-                  href="/auth/register"
+                <button
+                  type="button"
+                  onClick={openModal}
                   className="block w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold text-center hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 mb-3"
                 >
                   立即报名
-                </Link>
+                </button>
 
                 <button className="w-full py-3 border-2 border-neutral-200 text-neutral-700 rounded-xl font-semibold hover:border-blue-600 hover:text-blue-600 transition-all">
                   咨询客服

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useEnrollmentModal } from '@/contexts/EnrollmentModalContext';
 
 interface BannerSlide {
   id: number;
@@ -40,6 +41,7 @@ const slides: BannerSlide[] = [
 ];
 
 export default function Banner() {
+  const { openModal } = useEnrollmentModal();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -94,12 +96,22 @@ export default function Banner() {
                 <p className="text-xl lg:text-2xl mb-8 text-blue-100 animate-fade-in-delay">
                   {slide.subtitle}
                 </p>
-                <Link
-                  href={slide.link}
-                  className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-all shadow-2xl hover:shadow-3xl hover:-translate-y-1 animate-fade-in-delay-2"
-                >
-                  {slide.buttonText}
-                </Link>
+                {slide.buttonText === '立即报名' ? (
+                  <button
+                    type="button"
+                    onClick={openModal}
+                    className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-all shadow-2xl hover:shadow-3xl hover:-translate-y-1 animate-fade-in-delay-2"
+                  >
+                    {slide.buttonText}
+                  </button>
+                ) : (
+                  <Link
+                    href={slide.link}
+                    className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-all shadow-2xl hover:shadow-3xl hover:-translate-y-1 animate-fade-in-delay-2"
+                  >
+                    {slide.buttonText}
+                  </Link>
+                )}
               </div>
             </div>
           </div>

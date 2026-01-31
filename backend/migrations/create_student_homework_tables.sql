@@ -65,44 +65,6 @@ COMMENT ON COLUMN student_homework_attachment.file_size IS '文件大小（字�
 COMMENT ON COLUMN student_homework_attachment.file_type IS '文件类型（扩展名）';
 COMMENT ON COLUMN student_homework_attachment.sort_order IS '排序';
 
--- 3. 学生作业评分历史表
-CREATE TABLE IF NOT EXISTS student_homework_grade_history (
-    id SERIAL PRIMARY KEY,
-    submission_id INTEGER NOT NULL REFERENCES student_homework_submission(id) ON DELETE CASCADE,
-    teacher_id INTEGER NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
-    score FLOAT,
-    teacher_comment TEXT,
-    graded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_student_homework_grade_history_submission ON student_homework_grade_history(submission_id);
-CREATE INDEX idx_student_homework_grade_history_teacher ON student_homework_grade_history(teacher_id);
-CREATE INDEX idx_student_homework_grade_history_graded_at ON student_homework_grade_history(graded_at DESC);
-
-COMMENT ON TABLE student_homework_grade_history IS '学生作业评分历史表';
-COMMENT ON COLUMN student_homework_grade_history.submission_id IS '作业提交记录ID';
-COMMENT ON COLUMN student_homework_grade_history.teacher_id IS '评分教师ID';
-COMMENT ON COLUMN student_homework_grade_history.score IS '评分';
-COMMENT ON COLUMN student_homework_grade_history.teacher_comment IS '评分评语';
-COMMENT ON COLUMN student_homework_grade_history.graded_at IS '评分时间';
-
-CREATE TABLE IF NOT EXISTS student_homework_ai_grading_log (
-    id SERIAL PRIMARY KEY,
-    submission_id INTEGER NOT NULL REFERENCES student_homework_submission(id) ON DELETE CASCADE,
-    teacher_id INTEGER NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
-    llm_config_id INTEGER REFERENCES llm_config(id),
-    prompt TEXT NOT NULL,
-    result TEXT NOT NULL,
-    score FLOAT,
-    comment TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_student_homework_ai_grading_log_submission ON student_homework_ai_grading_log(submission_id);
-CREATE INDEX idx_student_homework_ai_grading_log_teacher ON student_homework_ai_grading_log(teacher_id);
-CREATE INDEX idx_student_homework_ai_grading_log_created_at ON student_homework_ai_grading_log(created_at DESC);
-
 -- 触发器：自动更新 updated_at
 CREATE OR REPLACE FUNCTION update_student_homework_submission_updated_at()
 RETURNS TRIGGER AS $$

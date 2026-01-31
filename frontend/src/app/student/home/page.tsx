@@ -143,7 +143,7 @@ export default function StudentHomePage() {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/30 pointer-events-none"></div>
       
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-200/80 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-lg border-b border-slate-200/80 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo and Title */}
@@ -163,12 +163,12 @@ export default function StudentHomePage() {
             <div className="hidden md:flex items-center gap-6">
               {dashboard && (
                 <>
-                  <div className="text-center">
+                  <div className="text-center px-4 py-2 rounded-xl border border-dashed border-slate-200 bg-white/80 shadow-sm">
                     <div className="text-2xl font-bold text-slate-900">{dashboard.stats.total_courses}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{t.student.home.learningStats.totalCourses}</div>
                   </div>
-                  <div className="w-px h-8 bg-slate-200"></div>
-                  <div className="text-center">
+                  <div className="w-px h-8 bg-slate-200/80"></div>
+                  <div className="text-center px-4 py-2 rounded-xl border border-dashed border-blue-200 bg-blue-50/50 shadow-sm">
                     <div className="text-2xl font-bold text-blue-600">{dashboard.stats.in_progress_courses}</div>
                     <div className="text-xs text-slate-500 mt-0.5">{t.student.home.learningStats.inProgressCourses}</div>
                   </div>
@@ -179,7 +179,7 @@ export default function StudentHomePage() {
             {/* Right: User Info and Logout */}
             <div className="flex items-center gap-3">
               {userInfo && (
-                <div className="hidden sm:flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                <div className="hidden sm:flex items-center gap-3 bg-white/80 rounded-xl px-3 py-2 border border-slate-200/80 shadow-sm">
                   <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
                     <span className="text-white text-sm font-semibold">
                       {(userInfo.full_name || userInfo.username || 'S').charAt(0).toUpperCase()}
@@ -195,7 +195,7 @@ export default function StudentHomePage() {
               )}
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-red-600 bg-white hover:bg-red-50 rounded-lg border border-slate-200 hover:border-red-200 transition-colors duration-200 cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-red-600 bg-white hover:bg-red-50 rounded-lg border border-dashed border-slate-300 hover:border-red-200 transition-colors duration-200 cursor-pointer"
               >
                 {t.student.home.logout}
               </button>
@@ -210,9 +210,9 @@ export default function StudentHomePage() {
           {/* Left Panel - 70% */}
           <div className="lg:col-span-2 space-y-6">
             {/* 我的课程 */}
-            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <section className="bg-white rounded-[28px] border border-slate-200/80 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)] transition-shadow duration-200">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center border border-blue-100/80 shadow-sm">
                   <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
@@ -228,17 +228,17 @@ export default function StudentHomePage() {
                     <div
                       key={course.id}
                       onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                      className="group bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-blue-300 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(37,99,235,0.15)] transition-all duration-200 cursor-pointer"
                     >
                       <div className="flex gap-4">
                         {(course.cover_image || course.cover_id) ? (
                           <img
                             src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
                             alt={course.title}
-                            className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                            className="w-20 h-20 rounded-xl object-cover flex-shrink-0 border border-slate-200/60"
                           />
                         ) : (
-                          <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                          <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 border border-blue-500/30">
                             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                             </svg>
@@ -282,7 +282,7 @@ export default function StudentHomePage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
+                <div className="text-center py-12 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80">
                   <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
@@ -292,9 +292,9 @@ export default function StudentHomePage() {
             </section>
 
             {/* 我的考试 */}
-            <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <section className="bg-white rounded-[28px] border border-slate-200/80 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)] transition-shadow duration-200">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100/80 shadow-sm">
                   <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
@@ -307,13 +307,13 @@ export default function StudentHomePage() {
                   {exams.slice(0, 5).map((exam) => (
                     <div
                       key={exam.id}
-                      className="bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all duration-200"
+                      className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-indigo-300 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(79,70,229,0.15)] transition-all duration-200"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="font-semibold text-slate-900 truncate">{exam.exam_name}</h3>
-                            <span className={`px-2 py-1 rounded-md text-xs font-medium ${getExamStatusColor(exam.status)}`}>
+                            <span className={`px-2 py-1 rounded-md text-xs font-medium border border-slate-200/60 ${getExamStatusColor(exam.status)}`}>
                               {getExamStatusText(exam.status)}
                             </span>
                           </div>
@@ -337,7 +337,7 @@ export default function StudentHomePage() {
                         {exam.status === 'in_progress' && (
                           <button
                             onClick={() => handleStartExam(exam)}
-                            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors duration-200 cursor-pointer flex-shrink-0"
+                            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg border border-indigo-500/30 shadow-sm shadow-indigo-600/20 hover:bg-indigo-700 hover:shadow-md transition-colors duration-200 cursor-pointer flex-shrink-0"
                           >
                             {t.student.home.myExams.startExam}
                           </button>
@@ -347,7 +347,7 @@ export default function StudentHomePage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
+                <div className="text-center py-12 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80">
                   <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
@@ -358,9 +358,9 @@ export default function StudentHomePage() {
 
             {/* 你可能感兴趣的课程 */}
             {dashboard && dashboard.recommended_courses.length > 0 && (
-              <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <section className="bg-white rounded-[28px] border border-slate-200/80 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)] transition-shadow duration-200">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100/80 shadow-sm">
                     <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
@@ -373,16 +373,16 @@ export default function StudentHomePage() {
                     <div
                       key={course.id}
                       onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                      className="group bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-emerald-300 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(16,185,129,0.15)] transition-all duration-200 cursor-pointer"
                     >
                       {(course.cover_image || course.cover_id) ? (
                         <img
                           src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
                           alt={course.title}
-                          className="w-full h-32 rounded-lg object-cover mb-3"
+                          className="w-full h-32 rounded-xl object-cover mb-3 border border-slate-200/60"
                         />
                       ) : (
-                        <div className="w-full h-32 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-3">
+                        <div className="w-full h-32 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-3 border border-emerald-500/30">
                           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
@@ -402,9 +402,9 @@ export default function StudentHomePage() {
 
             {/* 新上架课程 */}
             {dashboard && dashboard.new_courses.length > 0 && (
-              <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+              <section className="bg-white rounded-[28px] border border-slate-200/80 p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)] transition-shadow duration-200">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-rose-100 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100/80 shadow-sm">
                     <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
@@ -417,19 +417,19 @@ export default function StudentHomePage() {
                     <div
                       key={course.id}
                       onClick={() => router.push(`/student/courses/${course.id}`)}
-                      className="group relative bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-rose-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                      className="group relative bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:border-rose-300 hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(244,63,94,0.18)] transition-all duration-200 cursor-pointer"
                     >
-                      <div className="absolute top-2 right-2 bg-rose-500 text-white px-2 py-0.5 rounded text-xs font-semibold">
+                      <div className="absolute top-2 right-2 bg-rose-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold shadow-sm border border-rose-400/40">
                         NEW
                       </div>
                       {(course.cover_image || course.cover_id) ? (
                         <img
                           src={studentHomeService.getCoverUrl(course.cover_image, course.cover_id)}
                           alt={course.title}
-                          className="w-full h-32 rounded-lg object-cover mb-3"
+                          className="w-full h-32 rounded-xl object-cover mb-3 border border-slate-200/60"
                         />
                       ) : (
-                        <div className="w-full h-32 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mb-3">
+                        <div className="w-full h-32 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mb-3 border border-rose-500/30">
                           <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
@@ -453,11 +453,11 @@ export default function StudentHomePage() {
             {/* 学习偏好测评按钮 */}
             <button
               onClick={() => setShowProfileModal(true)}
-              className="group w-full bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="group w-full bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-5 border border-white/30 shadow-[0_18px_45px_rgba(37,99,235,0.35)] hover:shadow-[0_22px_50px_rgba(37,99,235,0.45)] transition-all duration-200 cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center border border-white/30">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
@@ -474,9 +474,9 @@ export default function StudentHomePage() {
             </button>
 
             {/* 学习曲线 */}
-            <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_14px_30px_rgba(15,23,42,0.08)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)] transition-shadow duration-200">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100/80 shadow-sm">
                   <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
@@ -501,7 +501,8 @@ export default function StudentHomePage() {
                     contentStyle={{ 
                         backgroundColor: 'white', 
                       border: '1px solid #e2e8f0',
-                        borderRadius: '8px'
+                        borderRadius: '10px',
+                        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.12)'
                     }}
                   />
                   <Line 
@@ -515,7 +516,7 @@ export default function StudentHomePage() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80">
                   <svg className="w-12 h-12 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
@@ -525,9 +526,9 @@ export default function StudentHomePage() {
             </section>
 
             {/* 老师互动 */}
-            <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_14px_30px_rgba(15,23,42,0.08)] hover:shadow-[0_18px_36px_rgba(15,23,42,0.12)] transition-shadow duration-200">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-100/80 shadow-sm">
                   <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
@@ -540,10 +541,10 @@ export default function StudentHomePage() {
                   {interactions.map((interaction) => (
                     <div
                       key={interaction.id}
-                      className={`rounded-lg p-3 border transition-colors duration-200 ${
+                      className={`relative rounded-2xl p-3 border shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition-colors duration-200 ${
                         interaction.is_read 
-                          ? 'bg-slate-50 border-slate-200' 
-                          : 'bg-amber-50 border-amber-200'
+                          ? 'bg-white border-slate-200/80' 
+                          : 'bg-amber-50 border-amber-200/80'
                       }`}
                     >
                       {!interaction.is_read && (
@@ -576,7 +577,7 @@ export default function StudentHomePage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80">
                   <svg className="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>

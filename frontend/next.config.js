@@ -12,7 +12,7 @@ const nextConfig = {
   },
   
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
   },
   webpack: (config, { isServer }) => {
     // Fix for has-tostringtag module issue
@@ -28,6 +28,10 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      {
+        source: '/api/v1/:path*',
+        destination: 'http://localhost:8000/api/v1/:path*',
+      },
       {
         source: '/homework/:path*',
         destination: 'https://ezijingai.oss-cn-beijing.aliyuncs.com/homework/:path*',
@@ -49,4 +53,3 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
-

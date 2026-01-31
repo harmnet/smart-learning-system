@@ -1,12 +1,4 @@
 import apiClient from '@/lib/api-client';
-import {
-  TeacherCourseOption,
-  TeacherHomeworkSubmissionListResponse,
-  TeacherHomeworkSubmissionDetail,
-  TeacherHomeworkGradeRequest,
-  TeacherHomeworkGradeHistoryResponse,
-  TeacherHomeworkAIGradeResponse,
-} from '@/types/homework';
 
 export interface TeacherInfo {
   id: number;
@@ -20,6 +12,36 @@ export interface TeacherInfo {
   intro?: string;
 }
 
+export interface TeacherAnalyticsOverview {
+  stats: {
+    total_courses: number;
+    student_count: number;
+    avg_completion_rate: number;
+    warning_students: number;
+    study_hours: number;
+  };
+  learning_trend: Array<{
+    date: string;
+    study_count: number;
+    study_duration: number;
+  }>;
+  course_progress: Array<{
+    course_id: number;
+    course_name: string;
+    study_minutes: number;
+    study_count: number;
+  }>;
+  score_distribution: Array<{ name: string; value: number }>;
+  risk_students: Array<{
+    student_id: number;
+    student_name: string;
+    student_no?: string;
+    course_name?: string;
+    reason: string;
+    progress: number;
+  }>;
+}
+
 class TeacherService {
   /**
    * 获取当前登录教师的信息
@@ -29,60 +51,10 @@ class TeacherService {
     return response.data;
   }
 
-  async getHomeworkCourses(): Promise<TeacherCourseOption[]> {
-    const response = await apiClient.get<TeacherCourseOption[]>('/teacher/homeworks/courses');
-    return response.data;
-  }
-
-  async getHomeworkSubmissions(params: {
-    skip?: number;
-    limit?: number;
-    course_id?: number;
-    student_no?: string;
-    student_name?: string;
-    homework_title?: string;
-    status?: 'submitted' | 'graded';
-  }): Promise<TeacherHomeworkSubmissionListResponse> {
-    const response = await apiClient.get<TeacherHomeworkSubmissionListResponse>(
-      '/teacher/homeworks/submissions',
-      { params }
-    );
-    return response.data;
-  }
-
-  async getHomeworkSubmissionDetail(submissionId: number): Promise<TeacherHomeworkSubmissionDetail> {
-    const response = await apiClient.get<TeacherHomeworkSubmissionDetail>(
-      `/teacher/homeworks/submissions/${submissionId}`
-    );
-    return response.data;
-  }
-
-  async gradeHomeworkSubmission(
-    submissionId: number,
-    data: TeacherHomeworkGradeRequest
-  ): Promise<TeacherHomeworkSubmissionDetail> {
-    const response = await apiClient.post<TeacherHomeworkSubmissionDetail>(
-      `/teacher/homeworks/submissions/${submissionId}/grade`,
-      data
-    );
-    return response.data;
-  }
-
-  async getHomeworkSubmissionHistory(
-    submissionId: number,
-    params?: { skip?: number; limit?: number }
-  ): Promise<TeacherHomeworkGradeHistoryResponse> {
-    const response = await apiClient.get<TeacherHomeworkGradeHistoryResponse>(
-      `/teacher/homeworks/submissions/${submissionId}/history`,
-      { params }
-    );
-    return response.data;
-  }
-
-  async aiGradeHomeworkSubmission(submissionId: number): Promise<TeacherHomeworkAIGradeResponse> {
-    const response = await apiClient.post<TeacherHomeworkAIGradeResponse>(
-      `/teacher/homeworks/submissions/${submissionId}/ai-grade`
-    );
+  async getAnalyticsOverview(range: 'week' | 'month' | 'term' = 'month'): Promise<TeacherAnalyticsOverview> {
+    const response = await apiClient.get<TeacherAnalyticsOverview>('/teacher/analytics/overview', {
+      params: { range }
+    });
     return response.data;
   }
 }

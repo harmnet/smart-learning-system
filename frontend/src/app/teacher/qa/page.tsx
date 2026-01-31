@@ -58,7 +58,7 @@ export default function TeacherQAPage() {
 
   return (
     <TeacherLayout>
-      <div className="min-h-screen bg-[#F8FAFC] p-8">
+      <div className="min-h-screen bg-slate-50 p-8">
         <div className="max-w-7xl mx-auto">
           {/* 页面标题 */}
           <div className="mb-8">
@@ -77,11 +77,13 @@ export default function TeacherQAPage() {
           {/* 加载状态 */}
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
           ) : courses.length === 0 ? (
             <div className="text-center py-20">
-              <MessageCircle className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+              <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-white border border-slate-200 flex items-center justify-center">
+                <MessageCircle className="w-6 h-6 text-blue-600" />
+              </div>
               <p className="text-slate-500 text-lg">{t.teacher.qa.noSessions}</p>
               <p className="text-slate-400 text-sm mt-2">{t.teacher.qa.noSessionsDesc}</p>
             </div>
@@ -90,13 +92,13 @@ export default function TeacherQAPage() {
               {courses.map((course) => (
                 <div
                   key={course.course_id}
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md hover:border-slate-300 transition-all duration-200"
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-200 transition-colors"
                 >
                   {/* 课程标题 */}
-                  <div className="px-6 py-4 bg-gradient-to-r from-violet-50 to-fuchsia-50 border-b border-slate-200">
+                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
-                        <BookOpen className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
+                        <BookOpen className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
                         <h2 className="text-lg font-semibold text-slate-900">{course.course_name}</h2>
@@ -117,15 +119,15 @@ export default function TeacherQAPage() {
                           {/* 左侧：学生信息和消息内容 */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
-                                <User className="w-5 h-5" />
+                              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
+                                <User className="w-5 h-5 text-white" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium text-slate-900">{student.student_name}</span>
                                   <span className="text-sm text-slate-500">({student.student_no})</span>
                                   {student.unread_count > 0 && (
-                                    <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
+                                    <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-medium rounded-full">
                                       {student.unread_count}{t.teacher.qa.unreadCount}
                                     </span>
                                   )}
@@ -141,7 +143,7 @@ export default function TeacherQAPage() {
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
                               <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
-                                <Clock className="w-3 h-3" />
+                                <Clock className="w-3 h-3 text-blue-600" />
                                 <span>{formatRelativeTime(student.latest_message_time)}</span>
                               </div>
                               <div className="text-xs text-slate-400">

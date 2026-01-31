@@ -60,6 +60,7 @@ export const en: Translations = {
     majors: 'Majors',
     classes: 'Classes',
     dictionary: 'Dictionary',
+    enrollments: 'Enrollments',
     finance: 'Finance',
     courseCovers: 'Course Covers',
     resources: 'Resources',
@@ -339,6 +340,53 @@ export const en: Translations = {
       deleteError: {
         hasClasses: 'Cannot delete major: There are classes associated with this major. Please delete or reassign the classes first.',
         hasTeachers: 'Cannot delete major: There are active teachers associated with this major. Please delete or reassign the teachers first.'
+      }
+    },
+    enrollments: {
+      title: 'Enrollment Management',
+      subtitle: 'Review enrollment submissions and approve or reject',
+      filters: {
+        phone: 'Phone',
+        status: 'Status',
+        dateFrom: 'From Date',
+        dateTo: 'To Date'
+      },
+      columns: {
+        id: 'ID',
+        phone: 'Phone',
+        childName: 'Student Name',
+        programme: 'Program',
+        createdAt: 'Submitted At',
+        status: 'Status',
+        rejectReason: 'Reject Reason'
+      },
+      status: {
+        pending: 'Pending',
+        approved: 'Approved',
+        rejected: 'Rejected'
+      },
+      actions: {
+        view: 'View',
+        approve: 'Approve',
+        reject: 'Reject'
+      },
+      confirmations: {
+        approve: 'Approve this enrollment?',
+        rejectReason: 'Enter a reject reason (optional)'
+      },
+      errors: {
+        adminIdMissing: 'Admin info missing. Please log in again.',
+        loadFailed: 'Failed to load details',
+        actionFailed: 'Action failed. Please try again.'
+      },
+      detail: {
+        title: 'Enrollment Detail',
+        empty: 'No details available'
+      },
+      fields: {
+        approvedAt: 'Approved At',
+        rejectedAt: 'Rejected At',
+        rejectReason: 'Reject Reason'
       }
     },
     finance: {

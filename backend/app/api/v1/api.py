@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning, upload, llm_call_logs, course_qa
+from app.api.v1.endpoints import auth, majors, courses, admin, dictionary, organizations, course_covers, teaching_resources, resource_folders, reference_materials, reference_folders, questions, knowledge_graphs, exam_papers, exams, exam_students, students, teachers, course_outline, llm_configs, student_learning, ai_creation, ppt_creation, admin_dashboard, student_home, student_exams, student_interactions, learning_profile, personalized_learning, upload, llm_call_logs, course_qa, enrollments, admin_enrollments, teacher_grades
 
 api_router = APIRouter()
 api_router.include_router(upload.router, prefix="/upload", tags=["upload"])
@@ -36,3 +36,6 @@ api_router.include_router(course_qa.router, prefix="/teacher", tags=["course-qa"
 api_router.include_router(ai_creation.router, prefix="/teacher/ai-creation", tags=["ai-creation"])
 api_router.include_router(ppt_creation.router, prefix="/teacher/ppt-creation", tags=["ppt-creation"])
 
+api_router.include_router(enrollments.router, prefix="/enrollments", tags=["enrollments"])
+api_router.include_router(admin_enrollments.router, prefix="/admin/enrollments", tags=["admin-enrollments"])
+api_router.include_router(teacher_grades.router, prefix="/teacher/grades", tags=["teacher-grades"])
